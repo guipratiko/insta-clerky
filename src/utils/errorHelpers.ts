@@ -1,44 +1,68 @@
-import { Response, NextFunction } from 'express';
 import { AppError } from '../middleware/errorHandler';
 
-export const createValidationError = (message: string): AppError => {
-  const error: AppError = new Error(message);
-  error.statusCode = 400;
-  error.status = 'validation_error';
-  return error;
-};
-
-export const createNotFoundError = (message: string): AppError => {
-  const error: AppError = new Error(message);
-  error.statusCode = 404;
-  error.status = 'not_found';
-  return error;
-};
-
-export const createUnauthorizedError = (message: string): AppError => {
-  const error: AppError = new Error(message);
-  error.statusCode = 401;
-  error.status = 'unauthorized';
-  return error;
-};
-
-export const createForbiddenError = (message: string): AppError => {
-  const error: AppError = new Error(message);
-  error.statusCode = 403;
-  error.status = 'forbidden';
-  return error;
-};
-
-export const handleControllerError = (
-  error: unknown,
-  defaultMessage: string
+/**
+ * Cria um AppError de forma consistente
+ */
+export const createAppError = (
+  message: string,
+  statusCode: number = 500,
+  status: string = 'error'
 ): AppError => {
-  if (error instanceof Error) {
+  const error: AppError = new Error(message);
+  error.statusCode = statusCode;
+  error.status = status;
+  return error;
+};
+
+/**
+ * Cria um AppError de validação
+ */
+export const createValidationError = (message: string): AppError => {
+  return createAppError(message, 400, 'validation_error');
+};
+
+/**
+ * Cria um AppError de não autorizado
+ */
+export const createUnauthorizedError = (message: string = 'Não autorizado'): AppError => {
+  return createAppError(message, 401, 'unauthorized');
+};
+
+/**
+ * Cria um AppError de não encontrado
+ */
+export const createNotFoundError = (resource: string = 'Recurso'): AppError => {
+  return createAppError(`${resource} não encontrado(a)`, 404, 'not_found');
+};
+
+/**
+ * Cria um AppError de conflito (duplicata)
+ */
+export const createConflictError = (message: string): AppError => {
+  return createAppError(message, 409, 'conflict');
+};
+
+/**
+ * Cria um AppError de acesso proibido (forbidden)
+ */
+export const createForbiddenError = (message: string = 'Acesso negado'): AppError => {
+  return createAppError(message, 403, 'forbidden');
+};
+
+/**
+ * Trata erros de catch de forma consistente
+ */
+export const handleControllerError = (error: unknown, defaultMessage: string = 'Erro ao processar requisição'): AppError => {
+  if (error instanceof Error && 'statusCode' in error) {
     const appError = error as AppError;
-    if (appError.statusCode) {
-      return appError;
-    }
-    return new Error(error.message || defaultMessage) as AppError;
+    appError.statusCode = appError.statusCode || 500;
+    appError.status = appError.status || 'server_error';
+    appError.message = appError.message || defaultMessage;
+    return appError;
   }
-  return new Error(defaultMessage) as AppError;
+
+  const appError: AppError = new Error(error instanceof Error ? error.message : defaultMessage);
+  appError.statusCode = 500;
+  appError.status = 'server_error';
+  return appError;
 };

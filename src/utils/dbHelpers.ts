@@ -4,22 +4,26 @@
 
 /**
  * Parsear campo JSONB do PostgreSQL de forma segura
+ * Compatível com a implementação do Backend
  */
-export function parseJsonbField<T>(value: unknown, defaultValue: T): T {
-  if (value === null || value === undefined) {
+export function parseJsonbField<T = any>(
+  field: string | object | null | undefined,
+  defaultValue: T
+): T {
+  if (!field) {
     return defaultValue;
   }
 
-  if (typeof value === 'string') {
+  if (typeof field === 'object') {
+    return field as T;
+  }
+
+  if (typeof field === 'string') {
     try {
-      return JSON.parse(value) as T;
+      return JSON.parse(field) as T;
     } catch {
       return defaultValue;
     }
-  }
-
-  if (typeof value === 'object') {
-    return value as T;
   }
 
   return defaultValue;

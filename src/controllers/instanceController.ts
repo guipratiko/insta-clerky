@@ -327,9 +327,9 @@ export const handleOAuthCallback = async (
     console.log('🔄 5. PREPARANDO DADOS PARA SALVAR...');
     
     // O user_id do token exchange pode ser diferente do user_id do /me
-    // O user_id geralmente é o ID da página/negócio usado nos webhooks
-    // Vamos usar ambos: accountInfo.user_id e tokenData.user_id
-    const webhookIds = [tokenData.user_id, accountInfo.user_id].filter((id, index, self) => 
+    // O user_id do accountInfo é o ID real usado nos webhooks (entry.id)
+    // Vamos usar o user_id do accountInfo como principal
+    const webhookIds = [accountInfo.user_id, tokenData.user_id].filter((id, index, self) => 
       id && self.indexOf(id) === index // Remover duplicatas
     );
 
@@ -338,10 +338,10 @@ export const handleOAuthCallback = async (
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
 
     const dataToSave = {
-      instagramAccountId: tokenData.user_id || accountInfo.user_id, // Preferir user_id do token exchange
+      instagramAccountId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real usado nos webhooks
       username: accountInfo.username,
       accessToken: longLivedTokenData.access_token.substring(0, 20) + '...', // Log apenas início do token por segurança
-      pageId: tokenData.user_id || accountInfo.user_id, // Preferir user_id do token exchange
+      pageId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real
       pageName: accountInfo.name || accountInfo.username,
       tokenExpiresAt: tokenExpiresAt.toISOString(),
       webhookIds, // Incluir ambos os IDs
@@ -368,10 +368,10 @@ export const handleOAuthCallback = async (
       instance._id.toString(),
       instance.userId.toString(),
       {
-        instagramAccountId: tokenData.user_id || accountInfo.user_id,
+        instagramAccountId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real usado nos webhooks
         username: accountInfo.username,
         accessToken: longLivedTokenData.access_token,
-        pageId: tokenData.user_id || accountInfo.user_id,
+        pageId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real
         pageName: accountInfo.name || accountInfo.username,
         tokenExpiresAt,
         webhookIds,
@@ -394,13 +394,11 @@ export const handleOAuthCallback = async (
     console.log('🔵 CALLBACK OAUTH CONCLUÍDO COM SUCESSO');
     console.log('🔵 ============================================');
     console.log(`✅ Conta Instagram conectada: @${accountInfo.username}`);
-    console.log(`   Instagram Account ID salvo: ${tokenData.user_id || accountInfo.user_id}`);
+    console.log(`   Instagram Account ID salvo: ${accountInfo.user_id || tokenData.user_id}`);
     console.log(`   Webhook IDs configurados: [${webhookIds.join(', ')}]`);
     console.log('');
 
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
-
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
   } catch (error: unknown) {
     console.error('❌ Erro no callback OAuth:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
