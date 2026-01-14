@@ -80,7 +80,7 @@ export class AutomationService {
       data.name,
       data.type,
       data.triggerType,
-      data.triggerType === 'keyword' ? JSON.stringify(data.keywords || []) : null,
+      data.triggerType === 'keyword' ? (data.keywords || []) : null,
       data.responseText,
       data.responseType,
       data.isActive !== undefined ? data.isActive : true,
@@ -166,7 +166,8 @@ export class AutomationService {
 
     if (data.keywords !== undefined) {
       updates.push(`keywords = $${paramIndex++}`);
-      values.push(data.triggerType === 'keyword' ? JSON.stringify(data.keywords) : null);
+      // Passar array diretamente - o driver pg converte automaticamente para TEXT[]
+      values.push(data.triggerType === 'keyword' ? data.keywords : null);
     }
 
     if (data.responseText !== undefined) {
