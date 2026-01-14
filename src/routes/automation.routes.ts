@@ -1,0 +1,18 @@
+import { Router } from 'express';
+import { protect } from '../middleware/auth';
+import * as automationController from '../controllers/automationController';
+
+const router = Router();
+
+// Todas as rotas requerem autenticação
+router.use(protect);
+
+// Rotas de automações
+router.post('/', automationController.createAutomation);
+router.get('/', automationController.getAutomations);
+router.get('/:id', automationController.getAutomationById);
+router.put('/:id', automationController.updateAutomation);
+router.delete('/:id', automationController.deleteAutomation);
+router.post('/:id/toggle', automationController.toggleAutomation);
+
+export default router;
