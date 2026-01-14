@@ -141,17 +141,17 @@ export const exchangeForLongLivedToken = async (shortLivedToken: string): Promis
  * Obter informações da conta Instagram
  */
 export const getInstagramAccountInfo = async (accessToken: string): Promise<{
-  id: string;
+  user_id: string;
   username: string;
   account_type: string;
   name?: string;
 }> => {
   const response = await requestMetaAPI('GET', '/me', accessToken, {
-    fields: 'id,username,account_type,name',
+    fields: 'user_id,username,account_type,name',
   });
 
   return response.data as {
-    id: string;
+    user_id: string;
     username: string;
     account_type: string;
     name?: string;
