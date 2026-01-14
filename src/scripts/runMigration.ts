@@ -1,27 +1,43 @@
 /**
  * Script para executar migrations do PostgreSQL
+ * Executa todas as migrations na pasta migrations/ em ordem numérica
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { pgPool } from '../config/databases';
-import { POSTGRES_CONFIG } from '../config/constants';
 
-async function runMigration() {
-  console.log('🔄 Iniciando migration do Insta-Clerky...');
+async function runMigrations() {
+  console.log('🔄 Iniciando migrations do Insta-Clerky...');
 
   try {
-    // Ler arquivo de migration
-    const migrationPath = join(__dirname, '../database/migrations/001_create_instagram_tables.sql');
-    const migrationSQL = readFileSync(migrationPath, 'utf-8');
+    const migrationsDir = join(__dirname, '../database/migrations');
+    const files = readdirSync(migrationsDir)
+      .filter((file) => file.endsWith('.sql'))
+      .sort(); // Ordenar por nome (001_, 002_, etc.)
 
-    // Executar migration
+    if (files.length === 0) {
+      console.log('⚠️ Nenhuma migration encontrada');
+      return;
+    }
+
+    console.log(`📋 Encontradas ${files.length} migration(s): ${files.join(', ')}`);
+
     const client = await pgPool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(migrationSQL);
+
+      for (const file of files) {
+        const migrationPath = join(migrationsDir, file);
+        const migrationSQL = readFileSync(migrationPath, 'utf-8');
+
+        console.log(`\n🔄 Executando migration: ${file}`);
+        await client.query(migrationSQL);
+        console.log(`✅ Migration ${file} executada com sucesso!`);
+      }
+
       await client.query('COMMIT');
-      console.log('✅ Migration executada com sucesso!');
+      console.log('\n✅ Todas as migrations executadas com sucesso!');
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -29,7 +45,7 @@ async function runMigration() {
       client.release();
     }
   } catch (error) {
-    console.error('❌ Erro ao executar migration:', error);
+    console.error('❌ Erro ao executar migrations:', error);
     process.exit(1);
   } finally {
     await pgPool.end();
@@ -37,4 +53,4 @@ async function runMigration() {
   }
 }
 
-runMigration();
+runMigrations();

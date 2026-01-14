@@ -122,6 +122,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_instagram_messages_updated_at ON instagram_messages;
 CREATE TRIGGER trigger_update_instagram_messages_updated_at
 BEFORE UPDATE ON instagram_messages
 FOR EACH ROW
@@ -135,6 +136,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_instagram_comments_updated_at ON instagram_comments;
 CREATE TRIGGER trigger_update_instagram_comments_updated_at
 BEFORE UPDATE ON instagram_comments
 FOR EACH ROW
@@ -148,6 +150,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_instagram_automations_updated_at ON instagram_automations;
 CREATE TRIGGER trigger_update_instagram_automations_updated_at
 BEFORE UPDATE ON instagram_automations
 FOR EACH ROW

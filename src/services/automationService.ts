@@ -15,6 +15,7 @@ export interface Automation {
   keywords: string[];
   responseText: string;
   responseType: 'direct' | 'comment';
+  delaySeconds: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +30,7 @@ export interface CreateAutomationData {
   keywords?: string[];
   responseText: string;
   responseType: 'direct' | 'comment';
+  delaySeconds?: number;
   isActive?: boolean;
 }
 
@@ -38,6 +40,7 @@ export interface UpdateAutomationData {
   keywords?: string[];
   responseText?: string;
   responseType?: 'direct' | 'comment';
+  delaySeconds?: number;
   isActive?: boolean;
 }
 
@@ -56,6 +59,7 @@ export class AutomationService {
       keywords: parseJsonbField<string[]>(row.keywords, []),
       responseText: row.response_text,
       responseType: row.response_type,
+      delaySeconds: row.delay_seconds || 0,
       isActive: row.is_active,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -66,11 +70,27 @@ export class AutomationService {
    * Criar nova automação
    */
   static async create(data: CreateAutomationData): Promise<Automation> {
+    // Validação adicional: garantir que keywords não está vazio quando triggerType é 'keyword'
+    if (data.triggerType === 'keyword') {
+      if (!data.keywords || data.keywords.length === 0) {
+        throw new Error('Palavras-chave são obrigatórias quando trigger_type é "keyword"');
+      }
+      
+      // Filtrar palavras-chave vazias
+      const validKeywords = data.keywords.filter((keyword) => keyword && keyword.trim().length > 0);
+      if (validKeywords.length === 0) {
+        throw new Error('As palavras-chave não podem estar vazias');
+      }
+      
+      // Atualizar data.keywords com apenas palavras-chave válidas
+      data.keywords = validKeywords.map((k) => k.trim());
+    }
+
     const query = `
       INSERT INTO instagram_automations (
         user_id, instance_id, name, type, trigger_type,
-        keywords, response_text, response_type, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        keywords, response_text, response_type, delay_seconds, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -80,9 +100,10 @@ export class AutomationService {
       data.name,
       data.type,
       data.triggerType,
-      data.triggerType === 'keyword' ? (data.keywords || []) : null,
+      data.triggerType === 'keyword' ? data.keywords : null,
       data.responseText,
       data.responseType,
+      data.delaySeconds !== undefined ? Math.max(0, Math.floor(data.delaySeconds)) : 0,
       data.isActive !== undefined ? data.isActive : true,
     ]);
 
@@ -150,6 +171,36 @@ export class AutomationService {
     userId: string,
     data: UpdateAutomationData
   ): Promise<Automation | null> {
+    // Buscar automação atual para validar triggerType
+    const currentAutomation = await this.getById(id, userId);
+    if (!currentAutomation) {
+      return null;
+    }
+
+    // Determinar o triggerType final (novo ou atual)
+    const finalTriggerType = data.triggerType !== undefined ? data.triggerType : currentAutomation.triggerType;
+
+    // Validação: garantir que keywords não está vazio quando triggerType é 'keyword'
+    if (finalTriggerType === 'keyword') {
+      if (data.keywords !== undefined) {
+        if (data.keywords.length === 0) {
+          throw new Error('Palavras-chave são obrigatórias quando trigger_type é "keyword"');
+        }
+        
+        // Filtrar palavras-chave vazias
+        const validKeywords = data.keywords.filter((keyword) => keyword && keyword.trim().length > 0);
+        if (validKeywords.length === 0) {
+          throw new Error('As palavras-chave não podem estar vazias');
+        }
+        
+        // Atualizar data.keywords com apenas palavras-chave válidas
+        data.keywords = validKeywords.map((k) => k.trim());
+      } else if (data.triggerType === 'keyword' && currentAutomation.triggerType !== 'keyword') {
+        // Se está mudando de 'all' para 'keyword' mas não forneceu keywords
+        throw new Error('É necessário informar palavras-chave ao mudar o tipo de trigger para "keyword"');
+      }
+    }
+
     const updates: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -167,7 +218,7 @@ export class AutomationService {
     if (data.keywords !== undefined) {
       updates.push(`keywords = $${paramIndex++}`);
       // Passar array diretamente - o driver pg converte automaticamente para TEXT[]
-      values.push(data.triggerType === 'keyword' ? data.keywords : null);
+      values.push(finalTriggerType === 'keyword' ? data.keywords : null);
     }
 
     if (data.responseText !== undefined) {
@@ -178,6 +229,11 @@ export class AutomationService {
     if (data.responseType !== undefined) {
       updates.push(`response_type = $${paramIndex++}`);
       values.push(data.responseType);
+    }
+
+    if (data.delaySeconds !== undefined) {
+      updates.push(`delay_seconds = $${paramIndex++}`);
+      values.push(Math.max(0, Math.floor(data.delaySeconds)));
     }
 
     if (data.isActive !== undefined) {

@@ -71,8 +71,14 @@ export const processDirectMessage = async (
         return;
       }
 
-      // Executar automação
+      // Executar automação com delay se configurado
       try {
+        // Aplicar delay antes de enviar a resposta
+        if (automation.delaySeconds > 0) {
+          console.log(`⏳ Aplicando delay de ${automation.delaySeconds} segundos antes de enviar resposta...`);
+          await new Promise((resolve) => setTimeout(resolve, automation.delaySeconds * 1000));
+        }
+
         if (automation.responseType === 'direct') {
           await sendDirectMessage(
             instanceWithToken.accessToken,
@@ -194,8 +200,13 @@ export const processComment = async (
         return;
       }
 
-      // Executar automação
+      // Executar automação com delay se configurado
       try {
+        // Aplicar delay antes de enviar a resposta
+        if (automation.delaySeconds > 0) {
+          console.log(`⏳ Aplicando delay de ${automation.delaySeconds} segundos antes de enviar resposta...`);
+          await new Promise((resolve) => setTimeout(resolve, automation.delaySeconds * 1000));
+        }
 
         if (automation.responseType === 'comment') {
           // Responder no comentário
