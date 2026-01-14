@@ -136,14 +136,17 @@ export const processDirectMessage = async (
                 break;
             }
           }
-        } else if (automation.responseType === 'direct' && automation.responseText) {
+        } else if (automation.responseType === 'direct' && automation.responseText && automation.responseText.trim().length > 0) {
           // Fallback para automações antigas (apenas texto)
           await sendDirectMessage(
             instanceWithToken.accessToken,
             senderId,
-            automation.responseText
+            automation.responseText.trim()
           );
           allResponses.push(automation.responseText);
+        } else {
+          console.error(`❌ Automação ${automation.id} não tem sequência de mensagens nem texto configurado`);
+          throw new Error('Automação de DM não tem sequência de mensagens nem texto configurado');
         }
 
         // Criar relatório (usar sender_id como username para DM)
@@ -274,9 +277,15 @@ export const processComment = async (
         }
 
         // Substituir variável $user-contact por @username (apenas para comentários)
-        let responseText = automation.responseText;
-        if (fromUsername) {
+        let responseText = automation.responseText || '';
+        if (fromUsername && responseText) {
           responseText = responseText.replace(/\$user-contact/g, `@${fromUsername}`);
+        }
+
+        // Validar que o texto não está vazio antes de enviar
+        if (!responseText || responseText.trim().length === 0) {
+          console.error(`❌ Automação ${automation.id} não tem texto de resposta configurado`);
+          throw new Error('Texto da resposta está vazio. Configure o texto da resposta na automação.');
         }
 
         if (automation.responseType === 'comment') {
@@ -287,7 +296,7 @@ export const processComment = async (
             responseText
           );
         } else if (automation.responseType === 'direct') {
-          // Enviar DM (comentários não devem ter responseType='direct', mas mantendo para compatibilidade)
+          // Enviar DM quando recebe comentário
           await sendDirectMessage(
             instanceWithToken.accessToken,
             fromUserId,
