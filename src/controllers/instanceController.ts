@@ -15,7 +15,7 @@ import { META_CONFIG } from '../config/constants';
 import { emitInstagramUpdate } from '../socket/socketClient';
 
 interface CreateInstanceBody {
-  name: string;
+  // name removido - será preenchido com username após OAuth
 }
 
 interface UpdateInstanceBody {
@@ -37,15 +37,9 @@ export const createInstance = async (
       return next(createValidationError('Usuário não autenticado'));
     }
 
-    const { name }: CreateInstanceBody = req.body;
-
-    if (!name || name.trim().length < 3) {
-      return next(createValidationError('Nome deve ter no mínimo 3 caracteres'));
-    }
-
+    // Criar instância sem nome - será preenchido com username após OAuth
     const instance = await InstanceService.create({
       userId,
-      name: name.trim(),
     });
 
     res.status(201).json({
@@ -330,6 +324,7 @@ export const handleOAuthCallback = async (
         pageName: accountInfo.name || accountInfo.username,
         tokenExpiresAt,
         webhookIds: [accountInfo.id],
+        name: accountInfo.username, // Usar username como nome da instância
       }
     );
 

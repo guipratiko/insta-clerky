@@ -13,8 +13,8 @@ export const refreshInstanceToken = async (instanceId: string): Promise<boolean>
   try {
     const instance = await InstagramInstance.findById(instanceId).select('+accessToken');
 
-    if (!instance || !instance.accessToken) {
-      console.error(`❌ Instância ${instanceId} não encontrada ou sem token`);
+    if (!instance || !instance.accessToken || !instance.tokenExpiresAt) {
+      console.error(`❌ Instância ${instanceId} não encontrada ou sem token/tokenExpiresAt`);
       return false;
     }
 

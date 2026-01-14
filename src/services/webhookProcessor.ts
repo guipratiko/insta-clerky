@@ -42,7 +42,7 @@ export const processDirectMessage = async (
         instanceId,
         userId,
         senderId,
-        event.recipient?.id || instance.instagramAccountId,
+        event.recipient?.id || instance.instagramAccountId || '',
         messageId,
         messageText,
         timestamp,
@@ -58,6 +58,12 @@ export const processDirectMessage = async (
     );
 
     if (automation) {
+      // Verificar se a instância tem instagramAccountId
+      if (!instance.instagramAccountId) {
+        console.error(`❌ Instância não tem instagramAccountId`);
+        return;
+      }
+
       // Buscar instância com accessToken
       const instanceWithToken = await InstanceService.getByInstagramAccountId(instance.instagramAccountId);
       if (!instanceWithToken || !instanceWithToken.accessToken) {
@@ -175,6 +181,12 @@ export const processComment = async (
     );
 
     if (automation) {
+      // Verificar se a instância tem instagramAccountId
+      if (!instance.instagramAccountId) {
+        console.error(`❌ Instância não tem instagramAccountId`);
+        return;
+      }
+
       // Buscar instância com accessToken
       const instanceWithToken = await InstanceService.getByInstagramAccountId(instance.instagramAccountId);
       if (!instanceWithToken || !instanceWithToken.accessToken) {

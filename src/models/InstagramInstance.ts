@@ -7,12 +7,12 @@ export interface IInstagramInstance extends Document {
   name: string; // Nome escolhido pelo usuário (apenas para exibição)
   userId: mongoose.Types.ObjectId;
   token?: string; // Token para autenticação de webhooks externos
-  instagramAccountId: string; // ID da conta no Instagram
-  username: string; // Username do Instagram
-  accessToken: string; // Token de acesso long-lived
-  pageId: string; // ID da página associada
-  pageName: string; // Nome da página
-  tokenExpiresAt: Date; // Data de expiração do token
+  instagramAccountId?: string; // ID da conta no Instagram (preenchido após OAuth)
+  username?: string; // Username do Instagram (preenchido após OAuth)
+  accessToken?: string; // Token de acesso long-lived (preenchido após OAuth)
+  pageId?: string; // ID da página associada (preenchido após OAuth)
+  pageName?: string; // Nome da página (preenchido após OAuth)
+  tokenExpiresAt?: Date; // Data de expiração do token (preenchido após OAuth)
   status: 'created' | 'connecting' | 'connected' | 'disconnected' | 'error';
   webhookIds: string[]; // IDs alternativos para webhooks
   createdAt: Date;
@@ -29,10 +29,9 @@ const InstagramInstanceSchema: Schema = new Schema(
     },
     name: {
       type: String,
-      required: [true, 'Nome da instância é obrigatório'],
+      required: false, // Será preenchido com username após OAuth
       trim: true,
-      minlength: [3, 'Nome deve ter no mínimo 3 caracteres'],
-      maxlength: [50, 'Nome deve ter no máximo 50 caracteres'],
+      default: '', // Valor padrão vazio
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -47,32 +46,32 @@ const InstagramInstanceSchema: Schema = new Schema(
     },
     instagramAccountId: {
       type: String,
-      required: [true, 'ID da conta Instagram é obrigatório'],
+      required: false, // Preenchido apenas após conexão OAuth
       trim: true,
     },
     username: {
       type: String,
-      required: [true, 'Username do Instagram é obrigatório'],
+      required: false, // Preenchido apenas após conexão OAuth
       trim: true,
     },
     accessToken: {
       type: String,
-      required: [true, 'Token de acesso é obrigatório'],
+      required: false, // Preenchido apenas após conexão OAuth
       select: false, // Não retornar token por padrão
     },
     pageId: {
       type: String,
-      required: [true, 'ID da página é obrigatório'],
+      required: false, // Preenchido apenas após conexão OAuth
       trim: true,
     },
     pageName: {
       type: String,
-      required: [true, 'Nome da página é obrigatório'],
+      required: false, // Preenchido apenas após conexão OAuth
       trim: true,
     },
     tokenExpiresAt: {
       type: Date,
-      required: [true, 'Data de expiração do token é obrigatória'],
+      required: false, // Preenchido apenas após conexão OAuth
     },
     status: {
       type: String,

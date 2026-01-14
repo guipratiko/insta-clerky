@@ -7,7 +7,7 @@ import { generateInstanceName } from '../utils/tokenGenerator';
 
 export interface CreateInstanceData {
   userId: string;
-  name: string;
+  // name removido - será preenchido com username após OAuth
 }
 
 export interface UpdateInstanceData {
@@ -30,7 +30,7 @@ export class InstanceService {
 
     const instance = await InstagramInstance.create({
       instanceName,
-      name: data.name,
+      // name não é obrigatório - será preenchido com username após OAuth
       userId: data.userId,
       status: 'created',
     });
@@ -104,6 +104,7 @@ export class InstanceService {
       pageName: string;
       tokenExpiresAt: Date;
       webhookIds?: string[];
+      name?: string; // Nome da instância (geralmente o username)
     }
   ): Promise<IInstagramInstance | null> {
     const instance = await InstagramInstance.findOneAndUpdate(
