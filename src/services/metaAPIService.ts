@@ -68,18 +68,38 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   access_token: string;
   user_id: string;
 }> => {
+  // Validar configurações antes de fazer a requisição
+  if (!META_CONFIG.APP_ID) {
+    console.error('❌ META_APP_ID não está configurado!');
+    throw new Error('Configuração do Meta App ID não encontrada');
+  }
+
+  if (!META_CONFIG.APP_SECRET) {
+    console.error('❌ META_APP_SECRET não está configurado!');
+    throw new Error('Configuração do Meta App Secret não encontrada');
+  }
+
   const apiBaseUrl = META_CONFIG.API_BASE_URL;
   const url = `${apiBaseUrl}/oauth/access_token`;
 
+  const params = {
+    client_id: META_CONFIG.APP_ID,
+    client_secret: META_CONFIG.APP_SECRET,
+    grant_type: 'authorization_code',
+    redirect_uri: META_CONFIG.REDIRECT_URI,
+    code,
+  };
+
+  console.log('🔐 Fazendo troca de código OAuth por token:', {
+    url,
+    client_id: META_CONFIG.APP_ID,
+    redirect_uri: META_CONFIG.REDIRECT_URI,
+    code_present: !!code,
+  });
+
   try {
     const response = await axios.post(url, null, {
-      params: {
-        client_id: META_CONFIG.APP_ID,
-        client_secret: META_CONFIG.APP_SECRET,
-        grant_type: 'authorization_code',
-        redirect_uri: META_CONFIG.REDIRECT_URI,
-        code,
-      },
+      params,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -89,6 +109,16 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
+      console.error('❌ Erro na troca de código OAuth:', {
+        status: axiosError.response?.status,
+        data: axiosError.response?.data,
+        params_sent: {
+          client_id: params.client_id ? 'presente' : 'ausente',
+          grant_type: params.grant_type,
+          redirect_uri: params.redirect_uri,
+          code_present: !!params.code,
+        },
+      });
       throw new Error(
         `OAuth Error: ${axiosError.response?.status} - ${JSON.stringify(axiosError.response?.data)}`
       );
