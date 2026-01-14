@@ -53,6 +53,13 @@ export class InstanceService {
   }
 
   /**
+   * Obter instância por ID apenas (usado no callback OAuth)
+   */
+  static async getByIdOnly(id: string): Promise<IInstagramInstance | null> {
+    return InstagramInstance.findById(id);
+  }
+
+  /**
    * Obter instância por instanceName
    */
   static async getByInstanceName(instanceName: string): Promise<IInstagramInstance | null> {

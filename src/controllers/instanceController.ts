@@ -306,9 +306,11 @@ export const handleOAuthCallback = async (
     const expiresIn = longLivedTokenData.expires_in || 5184000; // 60 dias em segundos
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // Buscar instância (não precisa de userId aqui pois já temos o ID)
-    const instance = await InstanceService.getByInstanceName(instanceId as string);
+    // Buscar instância por ID apenas (o state contém o _id da instância)
+    // Não precisamos do userId aqui pois o state já foi gerado pelo usuário autenticado
+    const instance = await InstanceService.getByIdOnly(instanceId as string);
     if (!instance) {
+      console.error(`❌ Instância não encontrada com ID: ${instanceId}`);
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=instance_not_found`);
     }
 
