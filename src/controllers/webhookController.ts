@@ -18,13 +18,14 @@ export const verifyWebhook = (
 
     if (mode === 'subscribe' && token === META_CONFIG.VERIFY_TOKEN) {
       console.log('✅ Webhook verificado com sucesso!');
-      return res.status(200).send(challenge);
+      res.status(200).send(challenge);
+      return;
     }
 
     console.error('❌ Token inválido ou modo incorreto');
-    return res.sendStatus(403);
+    res.sendStatus(403);
   } catch (error: unknown) {
-    return next(handleControllerError(error, 'Erro ao verificar webhook'));
+    next(handleControllerError(error, 'Erro ao verificar webhook'));
   }
 };
 

@@ -1,11 +1,11 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import {
   createValidationError,
   createNotFoundError,
   handleControllerError,
 } from '../utils/errorHelpers';
-import { InstanceService } from '../services/instanceService';
+import { InstanceService, UpdateInstanceData } from '../services/instanceService';
 import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
@@ -159,9 +159,20 @@ export const updateInstance = async (
       return next(createValidationError('Nome deve ter no mínimo 3 caracteres'));
     }
 
-    const updateData: { name?: string; status?: string } = {};
+    const updateData: UpdateInstanceData = {};
     if (name) updateData.name = name.trim();
-    if (status) updateData.status = status;
+    if (status) {
+      const validStatuses: Array<'created' | 'connecting' | 'connected' | 'disconnected' | 'error'> = [
+        'created',
+        'connecting',
+        'connected',
+        'disconnected',
+        'error',
+      ];
+      if (validStatuses.includes(status as any)) {
+        updateData.status = status as 'created' | 'connecting' | 'connected' | 'disconnected' | 'error';
+      }
+    }
 
     const instance = await InstanceService.update(id, userId, updateData);
 
@@ -269,10 +280,10 @@ export const initiateOAuth = async (
 };
 
 /**
- * Callback OAuth
+ * Callback OAuth (rota pública - Instagram chama diretamente)
  */
 export const handleOAuthCallback = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

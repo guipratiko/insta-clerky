@@ -40,7 +40,7 @@ export const META_CONFIG = {
   GRAPH_VERSION: process.env.META_GRAPH_VERSION || 'v24.0',
   APP_ID: process.env.META_APP_ID || '',
   APP_SECRET: process.env.META_APP_SECRET || '',
-  REDIRECT_URI: process.env.META_REDIRECT_URI || 'https://back.clerky.com.br/api/instagram/callback',
+  REDIRECT_URI: process.env.META_REDIRECT_URI || 'https://back.clerky.com.br/api/instagram/instances/oauth/callback',
   VERIFY_TOKEN: process.env.META_VERIFY_TOKEN || 'Tokenf7j4hd723fG5o2wle',
   BASE_URL: process.env.META_BASE_URL || 'https://graph.instagram.com',
   API_BASE_URL: process.env.META_API_BASE_URL || 'https://api.instagram.com',
