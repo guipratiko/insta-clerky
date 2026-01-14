@@ -5,6 +5,12 @@
 import { pgPool } from '../config/databases';
 import { parseJsonbField } from '../utils/dbHelpers';
 
+export interface ResponseSequenceItem {
+  type: 'text' | 'image' | 'video' | 'audio';
+  content: string; // texto ou URL da mídia
+  delay: number; // delay em segundos antes de enviar esta mensagem
+}
+
 export interface Automation {
   id: string;
   userId: string;
@@ -13,9 +19,10 @@ export interface Automation {
   type: 'dm' | 'comment';
   triggerType: 'keyword' | 'all';
   keywords: string[];
-  responseText: string;
+  responseText: string; // Para comentários (sempre texto)
   responseType: 'direct' | 'comment';
-  delaySeconds: number;
+  responseSequence?: ResponseSequenceItem[]; // Para DM (sequência de mensagens)
+  delaySeconds: number; // Delay global (deprecated, usar delay em cada item da sequência)
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -28,8 +35,9 @@ export interface CreateAutomationData {
   type: 'dm' | 'comment';
   triggerType: 'keyword' | 'all';
   keywords?: string[];
-  responseText: string;
+  responseText: string; // Obrigatório para comentários
   responseType: 'direct' | 'comment';
+  responseSequence?: ResponseSequenceItem[]; // Obrigatório para DM quando responseType === 'direct'
   delaySeconds?: number;
   isActive?: boolean;
 }
@@ -40,6 +48,7 @@ export interface UpdateAutomationData {
   keywords?: string[];
   responseText?: string;
   responseType?: 'direct' | 'comment';
+  responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
   isActive?: boolean;
 }
@@ -59,6 +68,7 @@ export class AutomationService {
       keywords: parseJsonbField<string[]>(row.keywords, []),
       responseText: row.response_text,
       responseType: row.response_type,
+      responseSequence: parseJsonbField<ResponseSequenceItem[]>(row.response_sequence, undefined),
       delaySeconds: row.delay_seconds || 0,
       isActive: row.is_active,
       createdAt: row.created_at,
@@ -89,8 +99,8 @@ export class AutomationService {
     const query = `
       INSERT INTO instagram_automations (
         user_id, instance_id, name, type, trigger_type,
-        keywords, response_text, response_type, delay_seconds, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        keywords, response_text, response_type, response_sequence, delay_seconds, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -103,6 +113,7 @@ export class AutomationService {
       data.triggerType === 'keyword' ? data.keywords : null,
       data.responseText,
       data.responseType,
+      data.responseSequence ? JSON.stringify(data.responseSequence) : null,
       data.delaySeconds !== undefined ? Math.max(0, Math.floor(data.delaySeconds)) : 0,
       data.isActive !== undefined ? data.isActive : true,
     ]);
@@ -229,6 +240,11 @@ export class AutomationService {
     if (data.responseType !== undefined) {
       updates.push(`response_type = $${paramIndex++}`);
       values.push(data.responseType);
+    }
+
+    if (data.responseSequence !== undefined) {
+      updates.push(`response_sequence = $${paramIndex++}`);
+      values.push(data.responseSequence ? JSON.stringify(data.responseSequence) : null);
     }
 
     if (data.delaySeconds !== undefined) {

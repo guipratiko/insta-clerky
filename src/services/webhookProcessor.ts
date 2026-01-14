@@ -5,7 +5,13 @@
 import { InstanceService } from './instanceService';
 import { AutomationService } from './automationService';
 import { ReportService } from './reportService';
-import { sendDirectMessage, replyToComment } from './metaAPIService';
+import {
+  sendDirectMessage,
+  sendDirectMessageImage,
+  sendDirectMessageVideo,
+  sendDirectMessageAudio,
+  replyToComment,
+} from './metaAPIService';
 import { pgPool } from '../config/databases';
 import { emitInstagramUpdate } from '../socket/socketClient';
 
@@ -71,30 +77,84 @@ export const processDirectMessage = async (
         return;
       }
 
-      // Executar automação com delay se configurado
+      // Executar automação
       try {
-        // Aplicar delay antes de enviar a resposta
-        if (automation.delaySeconds > 0) {
-          console.log(`⏳ Aplicando delay de ${automation.delaySeconds} segundos antes de enviar resposta...`);
-          await new Promise((resolve) => setTimeout(resolve, automation.delaySeconds * 1000));
-        }
+        let allResponses: string[] = [];
 
-        if (automation.responseType === 'direct') {
+        if (automation.responseType === 'direct' && automation.responseSequence) {
+          // Processar sequência de mensagens para DM
+          for (let i = 0; i < automation.responseSequence.length; i++) {
+            const item = automation.responseSequence[i];
+            
+            // Aplicar delay antes de enviar esta mensagem
+            if (item.delay > 0) {
+              console.log(`⏳ Aplicando delay de ${item.delay} segundos antes da mensagem ${i + 1}...`);
+              await new Promise((resolve) => setTimeout(resolve, item.delay * 1000));
+            }
+
+            // Enviar mensagem baseada no tipo
+            const pageId = instance.instagramAccountId || instanceWithToken.instagramAccountId;
+            if (!pageId) {
+              throw new Error('Instagram Account ID não encontrado');
+            }
+
+            switch (item.type) {
+              case 'text':
+                await sendDirectMessage(
+                  instanceWithToken.accessToken,
+                  senderId,
+                  item.content
+                );
+                allResponses.push(`Texto: ${item.content}`);
+                break;
+              case 'image':
+                await sendDirectMessageImage(
+                  instanceWithToken.accessToken,
+                  pageId,
+                  senderId,
+                  item.content
+                );
+                allResponses.push(`Imagem: ${item.content}`);
+                break;
+              case 'video':
+                await sendDirectMessageVideo(
+                  instanceWithToken.accessToken,
+                  pageId,
+                  senderId,
+                  item.content
+                );
+                allResponses.push(`Vídeo: ${item.content}`);
+                break;
+              case 'audio':
+                await sendDirectMessageAudio(
+                  instanceWithToken.accessToken,
+                  pageId,
+                  senderId,
+                  item.content
+                );
+                allResponses.push(`Áudio: ${item.content}`);
+                break;
+            }
+          }
+        } else if (automation.responseType === 'direct' && automation.responseText) {
+          // Fallback para automações antigas (apenas texto)
           await sendDirectMessage(
             instanceWithToken.accessToken,
             senderId,
             automation.responseText
           );
+          allResponses.push(automation.responseText);
         }
 
-        // Criar relatório
+        // Criar relatório (usar sender_id como username para DM)
         await ReportService.create({
           instanceId,
           userId,
           interactionType: 'dm',
           userIdInstagram: senderId,
+          username: senderId, // Para DM, usar sender_id como username
           interactionText: messageText,
-          responseText: automation.responseText,
+          responseText: allResponses.join(' | '),
           responseStatus: 'sent',
           timestamp,
         });
@@ -110,13 +170,18 @@ export const processDirectMessage = async (
         console.error(`❌ Erro ao executar automação:`, error);
 
         // Criar relatório com status failed
+        const failedResponseText = automation.responseSequence
+          ? automation.responseSequence.map((item) => `${item.type}: ${item.content}`).join(' | ')
+          : automation.responseText || 'Erro ao processar';
+        
         await ReportService.create({
           instanceId,
           userId,
           interactionType: 'dm',
           userIdInstagram: senderId,
+          username: senderId, // Para DM, usar sender_id como username
           interactionText: messageText,
-          responseText: automation.responseText,
+          responseText: failedResponseText,
           responseStatus: 'failed',
           timestamp,
         });
@@ -208,19 +273,25 @@ export const processComment = async (
           await new Promise((resolve) => setTimeout(resolve, automation.delaySeconds * 1000));
         }
 
+        // Substituir variável $user-contact por @username (apenas para comentários)
+        let responseText = automation.responseText;
+        if (fromUsername) {
+          responseText = responseText.replace(/\$user-contact/g, `@${fromUsername}`);
+        }
+
         if (automation.responseType === 'comment') {
           // Responder no comentário
           await replyToComment(
             instanceWithToken.accessToken,
             commentId,
-            automation.responseText
+            responseText
           );
         } else if (automation.responseType === 'direct') {
-          // Enviar DM
+          // Enviar DM (comentários não devem ter responseType='direct', mas mantendo para compatibilidade)
           await sendDirectMessage(
             instanceWithToken.accessToken,
             fromUserId,
-            automation.responseText
+            responseText
           );
         }
 
@@ -232,9 +303,9 @@ export const processComment = async (
           commentId,
           userIdInstagram: fromUserId,
           mediaId: postId,
-          username: fromUsername,
+          username: fromUsername, // Para comentários, usar username real
           interactionText: text,
-          responseText: automation.responseText,
+          responseText: responseText, // Usar texto com variável substituída
           responseStatus: 'sent',
           timestamp,
         });
@@ -252,6 +323,7 @@ export const processComment = async (
         console.error(`❌ Erro ao executar automação:`, error);
 
         // Criar relatório com status failed
+        const failedResponseText = automation.responseText || 'Erro ao processar';
         await ReportService.create({
           instanceId,
           userId,
@@ -259,9 +331,9 @@ export const processComment = async (
           commentId,
           userIdInstagram: fromUserId,
           mediaId: postId,
-          username: fromUsername,
+          username: fromUsername, // Para comentários, usar username real
           interactionText: text,
-          responseText: automation.responseText,
+          responseText: failedResponseText,
           responseStatus: 'failed',
           timestamp,
         });

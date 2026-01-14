@@ -58,8 +58,8 @@ export const handleControllerError = (error: unknown, defaultMessage: string = '
     appError.statusCode = appError.statusCode || 500;
     appError.status = appError.status || 'server_error';
     appError.message = appError.message || defaultMessage;
-    return appError;
-  }
+      return appError;
+    }
 
   const appError: AppError = new Error(error instanceof Error ? error.message : defaultMessage);
   appError.statusCode = 500;

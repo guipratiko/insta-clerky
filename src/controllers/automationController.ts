@@ -5,7 +5,7 @@ import {
   createNotFoundError,
   handleControllerError,
 } from '../utils/errorHelpers';
-import { AutomationService } from '../services/automationService';
+import { AutomationService, ResponseSequenceItem } from '../services/automationService';
 
 interface CreateAutomationBody {
   instanceId: string;
@@ -15,6 +15,7 @@ interface CreateAutomationBody {
   keywords?: string[];
   responseText: string;
   responseType: 'direct' | 'comment';
+  responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
   isActive?: boolean;
 }
@@ -25,8 +26,66 @@ interface UpdateAutomationBody {
   keywords?: string[];
   responseText?: string;
   responseType?: 'direct' | 'comment';
+  responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
   isActive?: boolean;
+}
+
+/**
+ * Validar URL de mídia
+ */
+function validateMediaUrl(url: string, type: 'image' | 'video' | 'audio'): boolean {
+  if (!url.startsWith('https://')) {
+    return false;
+  }
+
+  const urlLower = url.toLowerCase();
+  const validExtensions: Record<string, string[]> = {
+    image: ['jpg', 'jpeg', 'png'],
+    video: ['mp4', 'ogg', 'avi', 'mov', 'webm'],
+    audio: ['aac', 'm4a', 'wav', 'mp4', 'mp3'],
+  };
+
+  const extensions = validExtensions[type] || [];
+  return extensions.some((ext) => urlLower.endsWith(`.${ext}`));
+}
+
+/**
+ * Validar sequência de resposta
+ */
+function validateResponseSequence(sequence: ResponseSequenceItem[]): string | null {
+  if (sequence.length === 0) {
+    return 'Sequência não pode estar vazia';
+  }
+
+  if (sequence.length > 4) {
+    return 'Sequência pode ter no máximo 4 mensagens';
+  }
+
+  for (let i = 0; i < sequence.length; i++) {
+    const item = sequence[i];
+    
+    if (!['text', 'image', 'video', 'audio'].includes(item.type)) {
+      return `Tipo inválido na mensagem ${i + 1}: ${item.type}`;
+    }
+
+    if (!item.content || item.content.trim().length === 0) {
+      return `Conteúdo não pode estar vazio na mensagem ${i + 1}`;
+    }
+
+    if (item.delay < 0 || !Number.isInteger(item.delay)) {
+      return `Delay deve ser um número inteiro não negativo na mensagem ${i + 1}`;
+    }
+
+    // Validar URL para tipos de mídia
+    if (item.type !== 'text') {
+      if (!validateMediaUrl(item.content, item.type)) {
+        return `URL inválida na mensagem ${i + 1}. Deve ser HTTPS e ter extensão válida para ${item.type}`;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -51,21 +110,42 @@ export const createAutomation = async (
       keywords,
       responseText,
       responseType,
+      responseSequence,
       delaySeconds,
       isActive,
     }: CreateAutomationBody = req.body;
 
-    // Validações
-    if (!instanceId || !name || !type || !triggerType || !responseText || !responseType) {
+    // Validações básicas
+    if (!instanceId || !name || !type || !triggerType || !responseType) {
       return next(createValidationError('Todos os campos obrigatórios devem ser preenchidos'));
+    }
+
+    // Validações específicas por tipo de resposta
+    if (responseType === 'comment') {
+      // Comentários: apenas texto, sem sequência
+      if (!responseText || responseText.trim().length === 0) {
+        return next(createValidationError('Texto da resposta é obrigatório para comentários'));
+      }
+      if (responseSequence && responseSequence.length > 0) {
+        return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
+      }
+    } else if (responseType === 'direct') {
+      // DM: sequência obrigatória
+      if (!responseSequence || responseSequence.length === 0) {
+        return next(createValidationError('Sequência de mensagens é obrigatória para Direct Messages'));
+      }
+      const sequenceError = validateResponseSequence(responseSequence);
+      if (sequenceError) {
+        return next(createValidationError(sequenceError));
+      }
+      // DM não deve ter responseText quando tem sequência
+      if (responseText && responseText.trim().length > 0) {
+        return next(createValidationError('Direct Messages com sequência não devem ter responseText. Use a sequência de mensagens.'));
+      }
     }
 
     if (name.trim().length < 3) {
       return next(createValidationError('Nome deve ter no mínimo 3 caracteres'));
-    }
-
-    if (responseText.trim().length === 0) {
-      return next(createValidationError('Texto da resposta não pode estar vazio'));
     }
 
     // Validação rigorosa para palavras-chave quando triggerType é 'keyword'
@@ -96,8 +176,9 @@ export const createAutomation = async (
       type,
       triggerType,
       keywords: triggerType === 'keyword' ? keywords : undefined,
-      responseText: responseText.trim(),
+      responseText: responseType === 'comment' ? (responseText || '').trim() : '',
       responseType,
+      responseSequence: responseType === 'direct' ? responseSequence : undefined,
       delaySeconds: delaySeconds !== undefined ? delaySeconds : 0,
       isActive: isActive !== undefined ? isActive : true,
     });
@@ -189,6 +270,7 @@ export const updateAutomation = async (
       keywords,
       responseText,
       responseType,
+      responseSequence,
       delaySeconds,
       isActive,
     }: UpdateAutomationBody = req.body;
@@ -201,14 +283,43 @@ export const updateAutomation = async (
       return next(createValidationError('Nome deve ter no mínimo 3 caracteres'));
     }
 
-    if (responseText && responseText.trim().length === 0) {
-      return next(createValidationError('Texto da resposta não pode estar vazio'));
-    }
-
     // Buscar automação atual para verificar o triggerType atual
     const currentAutomation = await AutomationService.getById(id, userId);
     if (!currentAutomation) {
       return next(createNotFoundError('Automação'));
+    }
+
+    // Determinar responseType final
+    const finalResponseType = responseType || currentAutomation.responseType;
+
+    // Validações específicas por tipo de resposta
+    if (finalResponseType === 'comment') {
+      // Comentários: apenas texto, sem sequência
+      if (responseText !== undefined && responseText.trim().length === 0) {
+        return next(createValidationError('Texto da resposta não pode estar vazio para comentários'));
+      }
+      if (responseSequence !== undefined && responseSequence.length > 0) {
+        return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
+      }
+    } else if (finalResponseType === 'direct') {
+      // DM: sequência obrigatória se estiver atualizando
+      if (responseSequence !== undefined) {
+        if (responseSequence.length === 0) {
+          return next(createValidationError('Sequência de mensagens não pode estar vazia para Direct Messages'));
+        }
+        const sequenceError = validateResponseSequence(responseSequence);
+        if (sequenceError) {
+          return next(createValidationError(sequenceError));
+        }
+      } else if (responseType === 'direct' && currentAutomation.responseType === 'comment') {
+        // Mudando de comment para direct - sequência obrigatória
+        return next(createValidationError('Ao mudar para Direct Messages, é necessário fornecer uma sequência de mensagens'));
+      }
+      // DM não deve ter responseText quando tem sequência
+      if (responseText !== undefined && responseText.trim().length > 0 && 
+          (responseSequence !== undefined || currentAutomation.responseSequence)) {
+        return next(createValidationError('Direct Messages com sequência não devem ter responseText. Use a sequência de mensagens.'));
+      }
     }
 
     // Validação rigorosa para palavras-chave quando triggerType é 'keyword'
@@ -246,8 +357,26 @@ export const updateAutomation = async (
     if (name) updateData.name = name.trim();
     if (triggerType) updateData.triggerType = triggerType;
     if (keywords !== undefined) updateData.keywords = keywords;
-    if (responseText) updateData.responseText = responseText.trim();
     if (responseType) updateData.responseType = responseType;
+    
+    // Atualizar responseText apenas para comentários
+    if (responseText !== undefined) {
+      if (finalResponseType === 'comment') {
+        updateData.responseText = responseText.trim();
+      } else {
+        updateData.responseText = ''; // Limpar se mudou para direct
+      }
+    }
+    
+    // Atualizar responseSequence apenas para DM
+    if (responseSequence !== undefined) {
+      if (finalResponseType === 'direct') {
+        updateData.responseSequence = responseSequence;
+      } else {
+        updateData.responseSequence = undefined; // Limpar se mudou para comment
+      }
+    }
+    
     if (delaySeconds !== undefined) updateData.delaySeconds = delaySeconds;
     if (isActive !== undefined) updateData.isActive = isActive;
 

@@ -222,3 +222,75 @@ export const replyToComment = async (
 
   return response.data;
 };
+
+/**
+ * Enviar mensagem direta com imagem
+ */
+export const sendDirectMessageImage = async (
+  accessToken: string,
+  pageId: string,
+  recipientId: string,
+  imageUrl: string
+): Promise<unknown> => {
+  const response = await requestMetaAPI('POST', `/${pageId}/messages`, accessToken, {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'image',
+        payload: {
+          url: imageUrl,
+        },
+      },
+    },
+  });
+
+  return response.data;
+};
+
+/**
+ * Enviar mensagem direta com vídeo
+ */
+export const sendDirectMessageVideo = async (
+  accessToken: string,
+  pageId: string,
+  recipientId: string,
+  videoUrl: string
+): Promise<unknown> => {
+  const response = await requestMetaAPI('POST', `/${pageId}/messages`, accessToken, {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'video',
+        payload: {
+          url: videoUrl,
+        },
+      },
+    },
+  });
+
+  return response.data;
+};
+
+/**
+ * Enviar mensagem direta com áudio
+ */
+export const sendDirectMessageAudio = async (
+  accessToken: string,
+  pageId: string,
+  recipientId: string,
+  audioUrl: string
+): Promise<unknown> => {
+  const response = await requestMetaAPI('POST', `/${pageId}/messages`, accessToken, {
+    recipient: { id: recipientId },
+    message: {
+      attachment: {
+        type: 'audio',
+        payload: {
+          url: audioUrl,
+        },
+      },
+    },
+  });
+
+  return response.data;
+};
