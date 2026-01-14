@@ -282,6 +282,15 @@ export const handleOAuthCallback = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('\n🔵 ============================================');
+    console.log('🔵 CALLBACK OAUTH INICIADO');
+    console.log('🔵 ============================================\n');
+
+    // 1. Log dos query params recebidos
+    console.log('📥 1. QUERY PARAMS RECEBIDOS:');
+    console.log(JSON.stringify(req.query, null, 2));
+    console.log('');
+
     const { code, state: instanceId, error } = req.query;
 
     if (error) {
@@ -293,24 +302,30 @@ export const handleOAuthCallback = async (
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=no_code`);
     }
 
-    // Trocar código por token de curta duração
+    // 2. Trocar código por token de curta duração
+    console.log('🔄 2. TROCANDO CÓDIGO POR TOKEN DE CURTA DURAÇÃO...');
     const tokenData = await exchangeCodeForToken(code as string);
+    console.log('📋 RESPOSTA COMPLETA DO exchangeCodeForToken:');
+    console.log(JSON.stringify(tokenData, null, 2));
+    console.log('');
 
-    console.log(`📋 Token exchange retornou user_id: ${tokenData.user_id}`);
-
-    // Trocar por long-lived token
+    // 3. Trocar por long-lived token
+    console.log('🔄 3. TROCANDO POR LONG-LIVED TOKEN...');
     const longLivedTokenData = await exchangeForLongLivedToken(tokenData.access_token);
+    console.log('📋 RESPOSTA COMPLETA DO exchangeForLongLivedToken:');
+    console.log(JSON.stringify(longLivedTokenData, null, 2));
+    console.log('');
 
-    // Obter informações da conta
+    // 4. Obter informações da conta
+    console.log('🔄 4. OBTENDO INFORMAÇÕES DA CONTA INSTAGRAM...');
     const accountInfo = await getInstagramAccountInfo(longLivedTokenData.access_token);
+    console.log('📋 RESPOSTA COMPLETA DO getInstagramAccountInfo:');
+    console.log(JSON.stringify(accountInfo, null, 2));
+    console.log('');
 
-    console.log(`📋 Informações da conta Instagram obtidas:`, {
-      id: accountInfo.id,
-      username: accountInfo.username,
-      account_type: accountInfo.account_type,
-      name: accountInfo.name,
-    });
-
+    // 5. Preparar dados para salvar
+    console.log('🔄 5. PREPARANDO DADOS PARA SALVAR...');
+    
     // O user_id do token exchange pode ser diferente do ID do /me
     // O user_id geralmente é o ID da página/negócio usado nos webhooks
     // Vamos usar ambos: accountInfo.id e tokenData.user_id
@@ -318,46 +333,72 @@ export const handleOAuthCallback = async (
       id && self.indexOf(id) === index // Remover duplicatas
     );
 
-    console.log(`📋 IDs para webhook configurados:`, webhookIds);
-
     // Calcular data de expiração (60 dias)
     const expiresIn = longLivedTokenData.expires_in || 5184000; // 60 dias em segundos
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
 
-    // Buscar instância por ID apenas (o state contém o _id da instância)
-    // Não precisamos do userId aqui pois o state já foi gerado pelo usuário autenticado
+    const dataToSave = {
+      instagramAccountId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
+      username: accountInfo.username,
+      accessToken: longLivedTokenData.access_token.substring(0, 20) + '...', // Log apenas início do token por segurança
+      pageId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
+      pageName: accountInfo.name || accountInfo.username,
+      tokenExpiresAt: tokenExpiresAt.toISOString(),
+      webhookIds, // Incluir ambos os IDs
+      name: accountInfo.username, // Usar username como nome da instância
+    };
+
+    console.log('📋 DADOS QUE SERÃO SALVOS NA INSTÂNCIA:');
+    console.log(JSON.stringify(dataToSave, null, 2));
+    console.log('');
+
+    // 6. Buscar instância
+    console.log(`🔄 6. BUSCANDO INSTÂNCIA COM ID: ${instanceId}`);
     const instance = await InstanceService.getByIdOnly(instanceId as string);
     if (!instance) {
       console.error(`❌ Instância não encontrada com ID: ${instanceId}`);
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=instance_not_found`);
     }
+    console.log(`✅ Instância encontrada: ${instance.instanceName} (userId: ${instance.userId})`);
+    console.log('');
 
-    // Conectar instância
-    // Usar tokenData.user_id como instagramAccountId principal (geralmente é o ID da página usado nos webhooks)
+    // 7. Conectar instância
+    console.log('🔄 7. SALVANDO DADOS NA INSTÂNCIA...');
     await InstanceService.connectInstance(
       instance._id.toString(),
       instance.userId.toString(),
       {
-        instagramAccountId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
+        instagramAccountId: tokenData.user_id || accountInfo.id,
         username: accountInfo.username,
         accessToken: longLivedTokenData.access_token,
-        pageId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
+        pageId: tokenData.user_id || accountInfo.id,
         pageName: accountInfo.name || accountInfo.username,
         tokenExpiresAt,
-        webhookIds, // Incluir ambos os IDs
-        name: accountInfo.username, // Usar username como nome da instância
+        webhookIds,
+        name: accountInfo.username,
       }
     );
+    console.log('✅ Dados salvos com sucesso!');
+    console.log('');
 
-    // Emitir atualização via Socket.io
+    // 8. Emitir atualização via Socket.io
+    console.log('🔄 8. EMITINDO ATUALIZAÇÃO VIA SOCKET.IO...');
     emitInstagramUpdate(instance.userId.toString(), {
       instanceId: instance._id.toString(),
       status: 'connected',
     });
+    console.log('✅ Atualização emitida!');
+    console.log('');
 
+    console.log('🔵 ============================================');
+    console.log('🔵 CALLBACK OAUTH CONCLUÍDO COM SUCESSO');
+    console.log('🔵 ============================================');
     console.log(`✅ Conta Instagram conectada: @${accountInfo.username}`);
     console.log(`   Instagram Account ID salvo: ${tokenData.user_id || accountInfo.id}`);
     console.log(`   Webhook IDs configurados: [${webhookIds.join(', ')}]`);
+    console.log('');
+
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
 
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
   } catch (error: unknown) {
