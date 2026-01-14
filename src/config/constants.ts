@@ -45,20 +45,3 @@ export const META_CONFIG = {
   BASE_URL: process.env.META_BASE_URL || 'https://graph.instagram.com',
   API_BASE_URL: process.env.META_API_BASE_URL || 'https://api.instagram.com',
 };
-
-// Validar configurações críticas na inicialização
-if (!META_CONFIG.APP_ID) {
-  console.warn('⚠️ META_APP_ID não está configurado! A integração com Instagram não funcionará.');
-}
-
-if (!META_CONFIG.APP_SECRET) {
-  console.warn('⚠️ META_APP_SECRET não está configurado! A integração com Instagram não funcionará.');
-}
-
-if (META_CONFIG.APP_ID && META_CONFIG.APP_SECRET) {
-  console.log('✅ Configurações do Meta/Instagram carregadas:', {
-    APP_ID: META_CONFIG.APP_ID,
-    REDIRECT_URI: META_CONFIG.REDIRECT_URI,
-    GRAPH_VERSION: META_CONFIG.GRAPH_VERSION,
-  });
-}

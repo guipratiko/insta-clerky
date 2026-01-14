@@ -68,37 +68,18 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   access_token: string;
   user_id: string;
 }> => {
-  // Validar configurações antes de fazer a requisição
-  if (!META_CONFIG.APP_ID) {
-    console.error('❌ META_APP_ID não está configurado!');
-    throw new Error('Configuração do Meta App ID não encontrada');
-  }
-
-  if (!META_CONFIG.APP_SECRET) {
-    console.error('❌ META_APP_SECRET não está configurado!');
-    throw new Error('Configuração do Meta App Secret não encontrada');
-  }
-
   const apiBaseUrl = META_CONFIG.API_BASE_URL;
   const url = `${apiBaseUrl}/oauth/access_token`;
 
-  // Criar URLSearchParams para enviar como form data no body
-  const formData = new URLSearchParams();
-  formData.append('client_id', META_CONFIG.APP_ID);
-  formData.append('client_secret', META_CONFIG.APP_SECRET);
-  formData.append('grant_type', 'authorization_code');
-  formData.append('redirect_uri', META_CONFIG.REDIRECT_URI);
-  formData.append('code', code);
-
-  console.log('🔐 Fazendo troca de código OAuth por token:', {
-    url,
-    client_id: META_CONFIG.APP_ID,
-    redirect_uri: META_CONFIG.REDIRECT_URI,
-    code_present: !!code,
-  });
-
   try {
-    const response = await axios.post(url, formData.toString(), {
+    const response = await axios.post(url, null, {
+      params: {
+        client_id: META_CONFIG.APP_ID,
+        client_secret: META_CONFIG.APP_SECRET,
+        grant_type: 'authorization_code',
+        redirect_uri: META_CONFIG.REDIRECT_URI,
+        code,
+      },
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
@@ -108,16 +89,6 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
-      console.error('❌ Erro na troca de código OAuth:', {
-        status: axiosError.response?.status,
-        data: axiosError.response?.data,
-        params_sent: {
-          client_id: META_CONFIG.APP_ID ? 'presente' : 'ausente',
-          grant_type: 'authorization_code',
-          redirect_uri: META_CONFIG.REDIRECT_URI,
-          code_present: !!code,
-        },
-      });
       throw new Error(
         `OAuth Error: ${axiosError.response?.status} - ${JSON.stringify(axiosError.response?.data)}`
       );
