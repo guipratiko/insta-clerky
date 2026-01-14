@@ -290,11 +290,27 @@ export const processWebhook = async (
         continue;
       }
 
+      console.log(`🔍 Buscando instância para recipient ID: ${recipientId}`);
+
       // Buscar instância pelo instagramAccountId ou webhookIds
-      const instance = await InstanceService.getByInstagramAccountId(recipientId);
+      let instance = await InstanceService.getByInstagramAccountId(recipientId);
+
+      // Se não encontrou pelo entry.id, tentar buscar pelo recipient.id do evento de mensagem
+      if (!instance && entry.messaging && entry.messaging.length > 0) {
+        const firstMessage = entry.messaging[0];
+        const messageRecipientId = firstMessage.recipient?.id;
+        
+        if (messageRecipientId && messageRecipientId !== recipientId) {
+          console.log(`🔍 Tentando buscar pelo recipient.id do evento: ${messageRecipientId}`);
+          instance = await InstanceService.getByInstagramAccountId(messageRecipientId);
+        }
+      }
 
       if (!instance) {
         console.error(`❌ Instância não encontrada para Instagram Account ID: ${recipientId}`);
+        console.error(`📋 Entry completo:`, JSON.stringify(entry, null, 2));
+        // Log adicional para debug - listar todas as instâncias conectadas
+        console.error(`💡 Dica: Verifique se o instagramAccountId salvo corresponde ao ID do webhook`);
         continue;
       }
 

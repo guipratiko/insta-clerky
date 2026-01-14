@@ -296,11 +296,29 @@ export const handleOAuthCallback = async (
     // Trocar código por token de curta duração
     const tokenData = await exchangeCodeForToken(code as string);
 
+    console.log(`📋 Token exchange retornou user_id: ${tokenData.user_id}`);
+
     // Trocar por long-lived token
     const longLivedTokenData = await exchangeForLongLivedToken(tokenData.access_token);
 
     // Obter informações da conta
     const accountInfo = await getInstagramAccountInfo(longLivedTokenData.access_token);
+
+    console.log(`📋 Informações da conta Instagram obtidas:`, {
+      id: accountInfo.id,
+      username: accountInfo.username,
+      account_type: accountInfo.account_type,
+      name: accountInfo.name,
+    });
+
+    // O user_id do token exchange pode ser diferente do ID do /me
+    // O user_id geralmente é o ID da página/negócio usado nos webhooks
+    // Vamos usar ambos: accountInfo.id e tokenData.user_id
+    const webhookIds = [tokenData.user_id, accountInfo.id].filter((id, index, self) => 
+      id && self.indexOf(id) === index // Remover duplicatas
+    );
+
+    console.log(`📋 IDs para webhook configurados:`, webhookIds);
 
     // Calcular data de expiração (60 dias)
     const expiresIn = longLivedTokenData.expires_in || 5184000; // 60 dias em segundos
@@ -315,17 +333,18 @@ export const handleOAuthCallback = async (
     }
 
     // Conectar instância
+    // Usar tokenData.user_id como instagramAccountId principal (geralmente é o ID da página usado nos webhooks)
     await InstanceService.connectInstance(
       instance._id.toString(),
       instance.userId.toString(),
       {
-        instagramAccountId: accountInfo.id,
+        instagramAccountId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
         username: accountInfo.username,
         accessToken: longLivedTokenData.access_token,
-        pageId: accountInfo.id,
+        pageId: tokenData.user_id || accountInfo.id, // Preferir user_id do token exchange
         pageName: accountInfo.name || accountInfo.username,
         tokenExpiresAt,
-        webhookIds: [accountInfo.id],
+        webhookIds, // Incluir ambos os IDs
         name: accountInfo.username, // Usar username como nome da instância
       }
     );
@@ -336,7 +355,9 @@ export const handleOAuthCallback = async (
       status: 'connected',
     });
 
-    console.log(`✅ Conta Instagram conectada: @${accountInfo.username} (ID: ${accountInfo.id})`);
+    console.log(`✅ Conta Instagram conectada: @${accountInfo.username}`);
+    console.log(`   Instagram Account ID salvo: ${tokenData.user_id || accountInfo.id}`);
+    console.log(`   Webhook IDs configurados: [${webhookIds.join(', ')}]`);
 
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success`);
   } catch (error: unknown) {
