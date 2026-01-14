@@ -71,15 +71,22 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   const apiBaseUrl = META_CONFIG.API_BASE_URL;
   const url = `${apiBaseUrl}/oauth/access_token`;
 
+  // Validar que as configurações estão presentes
+  if (!META_CONFIG.APP_ID || !META_CONFIG.APP_SECRET) {
+    throw new Error('META_APP_ID e META_APP_SECRET devem estar configurados');
+  }
+
   try {
-    const response = await axios.post(url, null, {
-      params: {
-        client_id: META_CONFIG.APP_ID,
-        client_secret: META_CONFIG.APP_SECRET,
-        grant_type: 'authorization_code',
-        redirect_uri: META_CONFIG.REDIRECT_URI,
-        code,
-      },
+    // Usar URLSearchParams para enviar como form data no body
+    const formData = new URLSearchParams({
+      client_id: META_CONFIG.APP_ID,
+      client_secret: META_CONFIG.APP_SECRET,
+      grant_type: 'authorization_code',
+      redirect_uri: META_CONFIG.REDIRECT_URI,
+      code,
+    });
+
+    const response = await axios.post(url, formData.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
