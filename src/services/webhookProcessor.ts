@@ -258,55 +258,59 @@ export const processComment = async (
 
 /**
  * Processar webhook completo
+ * A instância é identificada pelo entry.id (ID da conta Instagram) que vem no evento
  */
 export const processWebhook = async (
-  instanceName: string,
   body: any
 ): Promise<void> => {
   try {
-    // Buscar instância por instanceName (que é o ID usado no webhook)
-    // O instanceName pode ser o ID da instância ou o instagramAccountId
-    let instance = await InstanceService.getByInstanceName(instanceName);
-    
-    // Se não encontrar por instanceName, tentar buscar por instagramAccountId
-    if (!instance) {
-      instance = await InstanceService.getByInstagramAccountId(instanceName);
-    }
-
-    if (!instance) {
-      console.error(`❌ Instância ${instanceName} não encontrada`);
+    // Verificar se é um evento do Instagram
+    if (body.object !== 'instagram') {
+      console.warn('⚠️ Webhook não é do Instagram:', body.object);
       return;
     }
 
-    const instanceId = instance._id.toString();
-    const userId = instance.userId.toString();
+    for (const entry of body.entry || []) {
+      const recipientId = entry.id; // ID da conta Instagram que recebeu o evento
 
-    // Verificar se é um evento do Instagram
-    if (body.object === 'instagram') {
-      for (const entry of body.entry || []) {
-        const recipientId = entry.id; // ID da conta Instagram que recebeu
+      if (!recipientId) {
+        console.warn('⚠️ Entry sem ID:', entry);
+        continue;
+      }
 
-        // Processar mensagens
-        if (entry.messaging) {
-          for (const event of entry.messaging) {
-            // Ignorar mensagens enviadas por nós (echoes)
-            if (event.message?.is_echo) {
-              continue;
-            }
+      // Buscar instância pelo instagramAccountId ou webhookIds
+      const instance = await InstanceService.getByInstagramAccountId(recipientId);
 
-            await processDirectMessage(instance, {
-              ...event,
-              recipient: { id: recipientId },
-            });
+      if (!instance) {
+        console.error(`❌ Instância não encontrada para Instagram Account ID: ${recipientId}`);
+        continue;
+      }
+
+      const instanceId = instance._id.toString();
+      const userId = instance.userId.toString();
+
+      console.log(`✅ Instância encontrada: ${instance.name} (${instance.instanceName})`);
+
+      // Processar mensagens
+      if (entry.messaging) {
+        for (const event of entry.messaging) {
+          // Ignorar mensagens enviadas por nós (echoes)
+          if (event.message?.is_echo) {
+            continue;
           }
-        }
 
-        // Processar comentários
-        if (entry.changes) {
-          for (const change of entry.changes) {
-            if (change.field === 'comments') {
-              await processComment(instance, change);
-            }
+          await processDirectMessage(instance, {
+            ...event,
+            recipient: { id: recipientId },
+          });
+        }
+      }
+
+      // Processar comentários
+      if (entry.changes) {
+        for (const change of entry.changes) {
+          if (change.field === 'comments') {
+            await processComment(instance, change);
           }
         }
       }

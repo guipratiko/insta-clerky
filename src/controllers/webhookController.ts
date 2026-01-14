@@ -38,15 +38,15 @@ export const handleWebhook = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { instanceName } = req.params;
     const body = req.body;
 
-    console.log(`📨 Webhook recebido para instância: ${instanceName}`);
+    console.log('📨 Webhook recebido do Meta');
     console.log('📦 Dados:', JSON.stringify(body, null, 2));
 
     // Processar webhook de forma assíncrona
     // Não aguardar para retornar resposta rápida ao Meta
-    processWebhook(instanceName, body).catch((error) => {
+    // A instância será identificada pelos dados do evento (entry.id)
+    processWebhook(body).catch((error) => {
       console.error('❌ Erro ao processar webhook (assíncrono):', error);
     });
 

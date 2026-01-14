@@ -42,14 +42,14 @@ app.get('/', (req: Request, res: Response) => {
       instances: '/api/instagram/instances',
       automations: '/api/instagram/automations',
       reports: '/api/instagram/reports',
-      webhook: '/webhook/instagram/:instanceName',
+      webhook: '/webhook/instagram',
     },
   });
 });
 
 // Rotas de Webhook (devem vir antes de /api pois são chamadas diretamente pelo Meta)
 app.use('/webhook', webhookRoutes);
-console.log('✅ Rotas de webhook registradas: /webhook/instagram/:instanceName');
+console.log('✅ Rotas de webhook registradas: /webhook/instagram');
 
 // Rotas da API
 app.use('/api', routes);
