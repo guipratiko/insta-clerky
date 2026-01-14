@@ -58,6 +58,10 @@ export class AutomationService {
    * Mapear row do banco para objeto Automation
    */
   private static mapRowToAutomation(row: any): Automation {
+    const responseSequence = row.response_sequence
+      ? parseJsonbField<ResponseSequenceItem[]>(row.response_sequence, [])
+      : undefined;
+
     return {
       id: row.id,
       userId: row.user_id,
@@ -68,7 +72,7 @@ export class AutomationService {
       keywords: parseJsonbField<string[]>(row.keywords, []),
       responseText: row.response_text,
       responseType: row.response_type,
-      responseSequence: parseJsonbField<ResponseSequenceItem[]>(row.response_sequence, undefined),
+      responseSequence: responseSequence && responseSequence.length > 0 ? responseSequence : undefined,
       delaySeconds: row.delay_seconds || 0,
       isActive: row.is_active,
       createdAt: row.created_at,
