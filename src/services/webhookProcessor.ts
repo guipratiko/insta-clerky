@@ -270,38 +270,87 @@ export const processComment = async (
 
       // Executar automação com delay se configurado
       try {
-        // Aplicar delay antes de enviar a resposta
+        // Aplicar delay global antes de enviar a resposta
         if (automation.delaySeconds > 0) {
           console.log(`⏳ Aplicando delay de ${automation.delaySeconds} segundos antes de enviar resposta...`);
           await new Promise((resolve) => setTimeout(resolve, automation.delaySeconds * 1000));
         }
 
-        // Substituir variável $user-contact por @username (apenas para comentários)
-        let responseText = automation.responseText || '';
-        if (fromUsername && responseText) {
-          responseText = responseText.replace(/\$user-contact/g, `@${fromUsername}`);
-        }
-
-        // Validar que o texto não está vazio antes de enviar
-        if (!responseText || responseText.trim().length === 0) {
-          console.error(`❌ Automação ${automation.id} não tem texto de resposta configurado`);
-          throw new Error('Texto da resposta está vazio. Configure o texto da resposta na automação.');
-        }
+        let allResponses: string[] = [];
 
         if (automation.responseType === 'comment') {
-          // Responder no comentário
+          // Responder no comentário: apenas texto
+          let responseText = automation.responseText || '';
+          if (fromUsername && responseText) {
+            responseText = responseText.replace(/\$user-contact/g, `@${fromUsername}`);
+          }
+
+          if (!responseText || responseText.trim().length === 0) {
+            console.error(`❌ Automação ${automation.id} não tem texto de resposta configurado`);
+            throw new Error('Texto da resposta está vazio. Configure o texto da resposta na automação.');
+          }
+
           await replyToComment(
             instanceWithToken.accessToken,
             commentId,
             responseText
           );
+          allResponses.push(responseText);
         } else if (automation.responseType === 'direct') {
-          // Enviar DM quando recebe comentário
-          await sendDirectMessage(
-            instanceWithToken.accessToken,
-            fromUserId,
-            responseText
-          );
+          // Enviar DM quando recebe comentário: pode ser sequência ou texto
+          if (automation.responseSequence && automation.responseSequence.length > 0) {
+            // Processar sequência de mensagens
+            const pageId = instance.instagramAccountId || instanceWithToken.instagramAccountId;
+            if (!pageId) {
+              throw new Error('Instagram Account ID não encontrado');
+            }
+
+            for (let i = 0; i < automation.responseSequence.length; i++) {
+              const item = automation.responseSequence[i];
+              
+              // Aplicar delay antes de enviar esta mensagem
+              if (item.delay > 0) {
+                console.log(`⏳ Aplicando delay de ${item.delay} segundos antes da mensagem ${i + 1}...`);
+                await new Promise((resolve) => setTimeout(resolve, item.delay * 1000));
+              }
+
+              // Enviar mensagem baseada no tipo
+              switch (item.type) {
+                case 'text':
+                  let contentToSend = item.content;
+                  // Não substituir $user-contact em sequências de DM (só em comentários)
+                  await sendDirectMessage(instanceWithToken.accessToken, fromUserId, contentToSend);
+                  allResponses.push(`Texto: ${contentToSend}`);
+                  break;
+                case 'image':
+                  await sendDirectMessageImage(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  allResponses.push(`Imagem: ${item.content}`);
+                  break;
+                case 'video':
+                  await sendDirectMessageVideo(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  allResponses.push(`Vídeo: ${item.content}`);
+                  break;
+                case 'audio':
+                  await sendDirectMessageAudio(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  allResponses.push(`Áudio: ${item.content}`);
+                  break;
+              }
+            }
+          } else {
+            // Fallback para texto simples
+            let responseText = automation.responseText || '';
+            if (!responseText || responseText.trim().length === 0) {
+              console.error(`❌ Automação ${automation.id} não tem texto de resposta nem sequência configurada`);
+              throw new Error('Configure o texto da resposta ou sequência de mensagens na automação.');
+            }
+
+            await sendDirectMessage(
+              instanceWithToken.accessToken,
+              fromUserId,
+              responseText
+            );
+            allResponses.push(responseText);
+          }
         }
 
         // Criar relatório
@@ -314,7 +363,7 @@ export const processComment = async (
           mediaId: postId,
           username: fromUsername, // Para comentários, usar username real
           interactionText: text,
-          responseText: responseText, // Usar texto com variável substituída
+          responseText: allResponses.join(' | '),
           responseStatus: 'sent',
           timestamp,
         });

@@ -120,11 +120,21 @@ export const createAutomation = async (
       return next(createValidationError('Todos os campos obrigatórios devem ser preenchidos'));
     }
 
+    // Debug: log dos dados recebidos
+    console.log('📋 Dados recebidos na criação de automação:', {
+      type,
+      responseType,
+      hasResponseSequence: !!responseSequence,
+      responseSequenceLength: responseSequence?.length || 0,
+      hasResponseText: !!responseText,
+      responseTextLength: responseText?.length || 0,
+    });
+
     // Validações específicas por tipo de interação e tipo de resposta
     if (type === 'comment') {
       // Automação para comentários
       if (responseType === 'comment') {
-        // Responder no comentário: precisa de texto
+        // Responder no comentário: precisa de texto (não pode usar sequência)
         if (!responseText || responseText.trim().length === 0) {
           return next(createValidationError('Texto da resposta é obrigatório para comentários'));
         }
@@ -132,12 +142,25 @@ export const createAutomation = async (
           return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
         }
       } else if (responseType === 'direct') {
-        // Responder via DM quando recebe comentário: precisa de texto
-        if (!responseText || responseText.trim().length === 0) {
-          return next(createValidationError('Texto da resposta é obrigatório para enviar DM quando recebe comentário'));
-        }
-        if (responseSequence && responseSequence.length > 0) {
-          return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
+        // Responder via DM quando recebe comentário: pode usar sequência OU texto
+        // Verificar se responseSequence existe e tem itens
+        const hasSequence = responseSequence && Array.isArray(responseSequence) && responseSequence.length > 0;
+        
+        if (hasSequence) {
+          // Se tem sequência, validar a sequência
+          const sequenceError = validateResponseSequence(responseSequence);
+          if (sequenceError) {
+            return next(createValidationError(sequenceError));
+          }
+          // Se tem sequência, não deve ter responseText
+          if (responseText && responseText.trim().length > 0) {
+            return next(createValidationError('Ao usar sequência de mensagens, não informe texto simples. Use apenas a sequência.'));
+          }
+        } else {
+          // Se não tem sequência, precisa de texto
+          if (!responseText || responseText.trim().length === 0) {
+            return next(createValidationError('É necessário informar texto da resposta ou sequência de mensagens para enviar DM quando recebe comentário'));
+          }
         }
       }
     } else if (type === 'dm') {
@@ -186,8 +209,20 @@ export const createAutomation = async (
     // Determinar responseText baseado no tipo de interação e tipo de resposta
     let finalResponseText = '';
     if (type === 'comment') {
-      // Para comentários, sempre precisa de responseText (seja para responder no comentário ou via DM)
-      finalResponseText = (responseText || '').trim();
+      // Para comentários
+      if (responseType === 'comment') {
+        // Responder no comentário: sempre precisa de texto
+        finalResponseText = (responseText || '').trim();
+      } else if (responseType === 'direct') {
+        // Responder via DM quando recebe comentário: texto OU sequência
+        if (responseSequence && responseSequence.length > 0) {
+          // Se tem sequência, não salva texto
+          finalResponseText = '';
+        } else {
+          // Se não tem sequência, salva texto
+          finalResponseText = (responseText || '').trim();
+        }
+      }
     } else if (type === 'dm') {
       // Para DM, responseText só é usado se não houver sequência (caso legado)
       finalResponseText = responseSequence && responseSequence.length > 0 ? '' : (responseText || '').trim();
@@ -202,7 +237,7 @@ export const createAutomation = async (
       keywords: triggerType === 'keyword' ? keywords : undefined,
       responseText: finalResponseText,
       responseType,
-      responseSequence: type === 'dm' && responseType === 'direct' ? responseSequence : undefined,
+      responseSequence: (type === 'dm' && responseType === 'direct') || (type === 'comment' && responseType === 'direct' && responseSequence && responseSequence.length > 0) ? responseSequence : undefined,
       delaySeconds: delaySeconds !== undefined ? delaySeconds : 0,
       isActive: isActive !== undefined ? isActive : true,
     });
@@ -321,7 +356,7 @@ export const updateAutomation = async (
     if (finalType === 'comment') {
       // Automação para comentários
       if (finalResponseType === 'comment') {
-        // Responder no comentário: precisa de texto
+        // Responder no comentário: precisa de texto (não pode usar sequência)
         if (responseText !== undefined && responseText.trim().length === 0) {
           return next(createValidationError('Texto da resposta não pode estar vazio para comentários'));
         }
@@ -329,12 +364,22 @@ export const updateAutomation = async (
           return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
         }
       } else if (finalResponseType === 'direct') {
-        // Responder via DM quando recebe comentário: precisa de texto
-        if (responseText !== undefined && responseText.trim().length === 0) {
-          return next(createValidationError('Texto da resposta não pode estar vazio para enviar DM quando recebe comentário'));
-        }
+        // Responder via DM quando recebe comentário: pode usar sequência OU texto
         if (responseSequence !== undefined && responseSequence.length > 0) {
-          return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
+          // Se tem sequência, validar a sequência
+          const sequenceError = validateResponseSequence(responseSequence);
+          if (sequenceError) {
+            return next(createValidationError(sequenceError));
+          }
+          // Se tem sequência, não deve ter responseText
+          if (responseText !== undefined && responseText.trim().length > 0) {
+            return next(createValidationError('Ao usar sequência de mensagens, não informe texto simples. Use apenas a sequência.'));
+          }
+        } else {
+          // Se não tem sequência, precisa de texto
+          if (responseText !== undefined && responseText.trim().length === 0) {
+            return next(createValidationError('É necessário informar texto da resposta ou sequência de mensagens para enviar DM quando recebe comentário'));
+          }
         }
       }
     } else if (finalType === 'dm') {
@@ -401,8 +446,20 @@ export const updateAutomation = async (
     // Atualizar responseText baseado no tipo de interação e tipo de resposta
     if (responseText !== undefined) {
       if (finalType === 'comment') {
-        // Para comentários, sempre salva responseText (seja para responder no comentário ou via DM)
-        updateData.responseText = responseText.trim();
+        // Para comentários
+        if (finalResponseType === 'comment') {
+          // Responder no comentário: sempre precisa de texto
+          updateData.responseText = responseText.trim();
+        } else if (finalResponseType === 'direct') {
+          // Responder via DM quando recebe comentário: texto OU sequência
+          if (responseSequence !== undefined && responseSequence.length > 0) {
+            // Se tem sequência, não salva texto
+            updateData.responseText = '';
+          } else {
+            // Se não tem sequência, salva texto
+            updateData.responseText = responseText.trim();
+          }
+        }
       } else if (finalType === 'dm') {
         // Para DM, responseText só é usado se não houver sequência (caso legado)
         if (responseSequence !== undefined || currentAutomation.responseSequence) {
@@ -413,12 +470,13 @@ export const updateAutomation = async (
       }
     }
     
-    // Atualizar responseSequence apenas para DM
+    // Atualizar responseSequence
     if (responseSequence !== undefined) {
-      if (finalType === 'dm' && finalResponseType === 'direct') {
+      if ((finalType === 'dm' && finalResponseType === 'direct') || 
+          (finalType === 'comment' && finalResponseType === 'direct' && responseSequence.length > 0)) {
         updateData.responseSequence = responseSequence;
       } else {
-        updateData.responseSequence = undefined; // Limpar se não é DM
+        updateData.responseSequence = undefined; // Limpar se não é válido
       }
     }
     
