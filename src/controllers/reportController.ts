@@ -154,9 +154,21 @@ export const getStatistics = async (
       end
     );
 
+    // Transformar os dados para o formato esperado pelo frontend
+    const formattedStats = {
+      totalInteractions: stats.total,
+      totalDMs: stats.byType.dm,
+      totalComments: stats.byType.comment,
+      totalResponses: stats.byStatus.sent + stats.byStatus.failed + stats.byStatus.pending,
+      successfulResponses: stats.byStatus.sent,
+      failedResponses: stats.byStatus.failed,
+      byType: stats.byType,
+      byStatus: stats.byStatus,
+    };
+
     res.status(200).json({
       status: 'success',
-      data: stats,
+      data: formattedStats,
     });
   } catch (error: unknown) {
     return next(handleControllerError(error, 'Erro ao buscar estatísticas'));
