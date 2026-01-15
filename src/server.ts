@@ -14,6 +14,7 @@ import routes from './routes';
 import webhookRoutes from './routes/webhook.routes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { connectSocket } from './socket/socketClient';
+import packageJson from '../package.json';
 
 const app: Express = express();
 const httpServer = createServer(app);
@@ -36,7 +37,7 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     message: 'Insta-Clerky API está funcionando',
-    version: '1.0.0',
+    version: process.env.VERSION || packageJson.version || '1.0.0',
     timestamp: new Date().toISOString(),
     endpoints: {
       instances: '/api/instagram/instances',
