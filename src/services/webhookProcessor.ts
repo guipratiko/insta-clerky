@@ -57,7 +57,6 @@ export const processDirectMessage = async (
     );
 
     // Buscar automações ativas para DM
-    console.log(`🔍 Buscando automação para DM - instanceId: ${instanceId}, texto: "${messageText}"`);
     const automation = await AutomationService.findMatchingAutomation(
       instanceId,
       'dm',
@@ -65,7 +64,6 @@ export const processDirectMessage = async (
     );
 
     if (automation) {
-      console.log(`✅ Automação encontrada: ${automation.name} (ID: ${automation.id})`);
       // Verificar se a instância tem instagramAccountId
       if (!instance.instagramAccountId) {
         console.error(`❌ Instância não tem instagramAccountId`);
