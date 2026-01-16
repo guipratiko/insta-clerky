@@ -323,15 +323,15 @@ export const processComment = async (
                   allResponses.push(`Texto: ${contentToSend}`);
                   break;
                 case 'image':
-                  await sendDirectMessageImage(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  await sendDirectMessageImage(instanceWithToken.accessToken, pageId, fromUserId, item.content);
                   allResponses.push(`Imagem: ${item.content}`);
                   break;
                 case 'video':
-                  await sendDirectMessageVideo(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  await sendDirectMessageVideo(instanceWithToken.accessToken, pageId, fromUserId, item.content);
                   allResponses.push(`Vídeo: ${item.content}`);
                   break;
                 case 'audio':
-                  await sendDirectMessageAudio(instanceWithToken.accessToken, fromUserId, item.content, pageId);
+                  await sendDirectMessageAudio(instanceWithToken.accessToken, pageId, fromUserId, item.content);
                   allResponses.push(`Áudio: ${item.content}`);
                   break;
               }
