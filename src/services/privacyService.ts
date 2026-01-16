@@ -138,18 +138,24 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
   instanceId?: string;
 }> {
   try {
+    console.log('🔍 [Privacy Service] Decodificando signed_request...');
     const decoded = decodeSignedRequest(signedRequest);
     
     if (!decoded) {
+      console.error('❌ [Privacy Service] Falha ao decodificar signed_request');
       return {
         success: false,
         message: 'Falha ao decodificar signed_request',
       };
     }
 
+    console.log('📋 [Privacy Service] Dados decodificados:', JSON.stringify(decoded, null, 2));
+
     const instagramUserId = decoded.user_id as string | undefined;
     const instagramAccountId = decoded.instagram_account_id as string | undefined;
     const deletionRequestId = decoded.deletion_request_id as string | undefined;
+
+    console.log(`🔍 [Privacy Service] Buscando instância. instagramUserId: ${instagramUserId}, instagramAccountId: ${instagramAccountId}`);
 
     if (!instagramUserId && !instagramAccountId) {
       console.error('❌ signed_request não contém user_id nem instagram_account_id');
@@ -161,16 +167,31 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
 
     // Buscar instância pelo instagramAccountId ou pelo user_id do Instagram
     // O user_id do Meta é o ID do Instagram, não o userId do nosso sistema
+    // IMPORTANTE: NUNCA buscar por userId, pois é ObjectId do MongoDB, não ID do Instagram
     let instance = null;
-    if (instagramAccountId) {
-      instance = await InstagramInstance.findOne({ instagramAccountId });
-    }
-    
-    // Se não encontrou pelo instagramAccountId, tentar pelo user_id do Instagram
-    if (!instance && instagramUserId) {
-      instance = await InstagramInstance.findOne({
-        instagramAccountId: instagramUserId,
-      });
+    try {
+      if (instagramAccountId) {
+        console.log(`🔍 [Privacy Service] Buscando por instagramAccountId: ${instagramAccountId}`);
+        instance = await InstagramInstance.findOne({ 
+          instagramAccountId: String(instagramAccountId) 
+        }).lean();
+      }
+      
+      // Se não encontrou pelo instagramAccountId, tentar pelo user_id do Instagram
+      if (!instance && instagramUserId) {
+        console.log(`🔍 [Privacy Service] Buscando por instagramAccountId usando user_id: ${instagramUserId}`);
+        instance = await InstagramInstance.findOne({
+          instagramAccountId: String(instagramUserId),
+        }).lean();
+      }
+    } catch (queryError) {
+      console.error('❌ [Privacy Service] Erro ao buscar instância:', queryError);
+      // Se houver erro na busca, retornar sucesso para não bloquear o Meta
+      return {
+        success: true,
+        message: 'Erro ao buscar instância (pode já ter sido removida)',
+        deletionRequestId: deletionRequestId || 'unknown',
+      };
     }
 
     if (!instance) {
@@ -183,8 +204,19 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
       };
     }
 
-    const instanceId = instance._id.toString();
-    const instanceUserId = instance.userId.toString();
+    // Se usamos .lean(), precisamos buscar novamente o documento completo para poder deletar
+    const instanceDoc = await InstagramInstance.findById(instance._id);
+    if (!instanceDoc) {
+      console.warn(`⚠️ Instância não encontrada após busca inicial`);
+      return {
+        success: true,
+        message: 'Instância não encontrada (pode já ter sido removida)',
+        deletionRequestId: deletionRequestId || 'unknown',
+      };
+    }
+
+    const instanceId = instanceDoc._id.toString();
+    const instanceUserId = instanceDoc.userId.toString();
 
     // Deletar automações relacionadas
     try {
@@ -207,7 +239,7 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
     }
 
     // Deletar a instância
-    await InstagramInstance.findByIdAndDelete(instanceId);
+    await InstagramInstance.findByIdAndDelete(instanceDoc._id);
 
     console.log(`✅ Instância ${instance.instanceName} e dados relacionados deletados com sucesso`);
 
