@@ -53,6 +53,13 @@ export class InstanceService {
   }
 
   /**
+   * Obter instância por ID incluindo accessToken (para revogação de permissões)
+   */
+  static async getByIdWithToken(id: string, userId: string): Promise<IInstagramInstance | null> {
+    return InstagramInstance.findOne({ _id: id, userId }).select('+accessToken');
+  }
+
+  /**
    * Obter instância por ID apenas (usado no callback OAuth)
    */
   static async getByIdOnly(id: string): Promise<IInstagramInstance | null> {

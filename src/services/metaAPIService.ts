@@ -294,3 +294,35 @@ export const sendDirectMessageAudio = async (
 
   return response.data;
 };
+
+/**
+ * Obter permissões concedidas do usuário
+ */
+export const getUserPermissions = async (
+  accessToken: string,
+  userId: string
+): Promise<Array<{ permission: string; status: string }>> => {
+  const response = await requestMetaAPI('GET', `/${userId}/permissions`, accessToken);
+  
+  const data = response.data as { data?: Array<{ permission: string; status: string }> };
+  return data.data || [];
+};
+
+/**
+ * Revogar uma permissão específica do usuário
+ */
+export const revokePermission = async (
+  accessToken: string,
+  userId: string,
+  permissionName: string
+): Promise<boolean> => {
+  try {
+    const response = await requestMetaAPI('DELETE', `/${userId}/permissions/${permissionName}`, accessToken);
+    const data = response.data as { success?: boolean };
+    return data.success === true;
+  } catch (error) {
+    // Logar erro mas não lançar exceção
+    console.error(`❌ Erro ao revogar permissão ${permissionName}:`, error);
+    return false;
+  }
+};
