@@ -295,11 +295,11 @@ export const handleOAuthCallback = async (
 
     if (error) {
       console.error('❌ Erro no OAuth:', error);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=oauth_failed`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=oauth_failed&tab=instagram`);
     }
 
     if (!code || !instanceId) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=no_code`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=no_code&tab=instagram`);
     }
 
     // 2. Trocar código por token de curta duração
@@ -357,7 +357,7 @@ export const handleOAuthCallback = async (
     const instance = await InstanceService.getByIdOnly(instanceId as string);
     if (!instance) {
       console.error(`❌ Instância não encontrada com ID: ${instanceId}`);
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=instance_not_found`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=instance_not_found&tab=instagram`);
     }
     console.log(`✅ Instância encontrada: ${instance.instanceName} (userId: ${instance.userId})`);
     console.log('');
@@ -398,68 +398,11 @@ export const handleOAuthCallback = async (
     console.log(`   Webhook IDs configurados: [${webhookIds.join(', ')}]`);
     console.log('');
 
-    // Retornar HTML que fecha a janela automaticamente e redireciona para o Instagram
-    // Isso permite que o usuário volte para o app do Instagram após conectar
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Instagram Conectado</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-            }
-            .container {
-              text-align: center;
-              padding: 2rem;
-            }
-            .success-icon {
-              font-size: 4rem;
-              margin-bottom: 1rem;
-            }
-            h1 {
-              margin: 0 0 1rem 0;
-              font-size: 1.5rem;
-            }
-            p {
-              margin: 0.5rem 0;
-              opacity: 0.9;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="success-icon">✅</div>
-            <h1>Conta Instagram Conectada!</h1>
-            <p>Você pode fechar esta janela.</p>
-            <p>Redirecionando para o Instagram...</p>
-          </div>
-          <script>
-            // Tentar redirecionar para o app do Instagram
-            setTimeout(function() {
-              window.location.href = 'instagram://';
-              // Se não conseguir abrir o app, fechar a janela após 2 segundos
-              setTimeout(function() {
-                window.close();
-              }, 2000);
-            }, 1500);
-          </script>
-        </body>
-      </html>
-    `;
-    res.status(200).send(html);
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?connected=success&tab=instagram`);
   } catch (error: unknown) {
     console.error('❌ Erro no callback OAuth:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=${encodeURIComponent(errorMessage)}`);
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/gerenciador-conexoes?error=${encodeURIComponent(errorMessage)}&tab=instagram`);
   }
 };
 
