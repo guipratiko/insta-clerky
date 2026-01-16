@@ -71,11 +71,11 @@ export async function handleDeauthorization(signedRequest: string): Promise<{
       };
     }
 
-    // O Meta pode enviar user_id ou instagram_account_id
-    const userId = decoded.user_id as string | undefined;
+    // O Meta pode enviar user_id (que é o ID do Instagram) ou instagram_account_id
+    const instagramUserId = decoded.user_id as string | undefined;
     const instagramAccountId = decoded.instagram_account_id as string | undefined;
 
-    if (!userId && !instagramAccountId) {
+    if (!instagramUserId && !instagramAccountId) {
       console.error('❌ signed_request não contém user_id nem instagram_account_id');
       return {
         success: false,
@@ -83,25 +83,22 @@ export async function handleDeauthorization(signedRequest: string): Promise<{
       };
     }
 
-    // Buscar instância pelo instagramAccountId (mais confiável) ou userId
+    // Buscar instância pelo instagramAccountId (mais confiável) ou pelo user_id do Instagram
+    // O user_id do Meta é o ID do Instagram, não o userId do nosso sistema
     let instance = null;
     if (instagramAccountId) {
       instance = await InstagramInstance.findOne({ instagramAccountId });
     }
     
-    // Se não encontrou pelo instagramAccountId, tentar pelo userId (pode ser o user_id do Meta)
-    if (!instance && userId) {
-      // Tentar encontrar por qualquer campo que possa conter o userId
+    // Se não encontrou pelo instagramAccountId, tentar pelo user_id do Instagram
+    if (!instance && instagramUserId) {
       instance = await InstagramInstance.findOne({
-        $or: [
-          { instagramAccountId: userId },
-          { userId: userId }, // Caso o userId seja o mesmo do nosso sistema
-        ],
+        instagramAccountId: instagramUserId,
       });
     }
 
     if (!instance) {
-      console.warn(`⚠️ Instância não encontrada para desautorização. userId: ${userId}, instagramAccountId: ${instagramAccountId}`);
+      console.warn(`⚠️ Instância não encontrada para desautorização. instagramUserId: ${instagramUserId}, instagramAccountId: ${instagramAccountId}`);
       // Retornar sucesso mesmo se não encontrar, pois o Meta espera 200 OK
       return {
         success: true,
@@ -150,11 +147,11 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
       };
     }
 
-    const userId = decoded.user_id as string | undefined;
+    const instagramUserId = decoded.user_id as string | undefined;
     const instagramAccountId = decoded.instagram_account_id as string | undefined;
     const deletionRequestId = decoded.deletion_request_id as string | undefined;
 
-    if (!userId && !instagramAccountId) {
+    if (!instagramUserId && !instagramAccountId) {
       console.error('❌ signed_request não contém user_id nem instagram_account_id');
       return {
         success: false,
@@ -162,23 +159,22 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
       };
     }
 
-    // Buscar instância
+    // Buscar instância pelo instagramAccountId ou pelo user_id do Instagram
+    // O user_id do Meta é o ID do Instagram, não o userId do nosso sistema
     let instance = null;
     if (instagramAccountId) {
       instance = await InstagramInstance.findOne({ instagramAccountId });
     }
     
-    if (!instance && userId) {
+    // Se não encontrou pelo instagramAccountId, tentar pelo user_id do Instagram
+    if (!instance && instagramUserId) {
       instance = await InstagramInstance.findOne({
-        $or: [
-          { instagramAccountId: userId },
-          { userId: userId },
-        ],
+        instagramAccountId: instagramUserId,
       });
     }
 
     if (!instance) {
-      console.warn(`⚠️ Instância não encontrada para exclusão de dados. userId: ${userId}, instagramAccountId: ${instagramAccountId}`);
+      console.warn(`⚠️ Instância não encontrada para exclusão de dados. instagramUserId: ${instagramUserId}, instagramAccountId: ${instagramAccountId}`);
       // Retornar sucesso com deletion_request_id mesmo se não encontrar
       return {
         success: true,
