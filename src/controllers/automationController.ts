@@ -6,6 +6,7 @@ import {
   handleControllerError,
 } from '../utils/errorHelpers';
 import { AutomationService, ResponseSequenceItem } from '../services/automationService';
+import { InstanceService } from '../services/instanceService';
 
 interface CreateAutomationBody {
   instanceId: string;
@@ -120,8 +121,19 @@ export const createAutomation = async (
       return next(createValidationError('Todos os campos obrigatórios devem ser preenchidos'));
     }
 
+    // Verificar se a instância existe e usar o _id real
+    const instance = await InstanceService.getById(instanceId, userId);
+    if (!instance) {
+      return next(createNotFoundError('Instância'));
+    }
+    
+    // Usar o _id real da instância para salvar a automação
+    const realInstanceId = instance._id.toString();
+    
     // Debug: log dos dados recebidos
     console.log('📋 Dados recebidos na criação de automação:', {
+      instanceIdRecebido: instanceId,
+      instanceIdReal: realInstanceId,
       type,
       responseType,
       hasResponseSequence: !!responseSequence,
@@ -230,7 +242,7 @@ export const createAutomation = async (
 
     const automation = await AutomationService.create({
       userId,
-      instanceId,
+      instanceId: realInstanceId,
       name: name.trim(),
       type,
       triggerType,
