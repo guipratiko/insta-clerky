@@ -188,7 +188,7 @@ export async function handleDataDeletion(signedRequest: string): Promise<{
     }
 
     const instanceId = instance._id.toString();
-    const instanceUserId = instance.userId;
+    const instanceUserId = instance.userId.toString();
 
     // Deletar automações relacionadas
     try {
