@@ -54,6 +54,8 @@ console.log('✅ Rotas de webhook registradas: /webhook/instagram');
 
 // Rotas da API
 app.use('/api', routes);
+console.log('✅ Rotas de API registradas: /api/instagram/*');
+console.log('✅ Rotas de privacidade registradas: /api/instagram/privacy/*');
 
 // Middleware de erro 404
 app.use(notFoundHandler);

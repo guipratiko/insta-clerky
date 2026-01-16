@@ -16,6 +16,11 @@ export const deauthorize = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('📨 [Privacy Controller] Requisição de desautorização recebida');
+    console.log('📨 [Privacy Controller] Path:', req.path);
+    console.log('📨 [Privacy Controller] URL:', req.url);
+    console.log('📨 [Privacy Controller] Body:', JSON.stringify(req.body, null, 2));
+    
     const { signed_request } = req.body;
 
     if (!signed_request) {
@@ -66,6 +71,11 @@ export const deleteData = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('📨 [Privacy Controller] Requisição de exclusão de dados recebida');
+    console.log('📨 [Privacy Controller] Path:', req.path);
+    console.log('📨 [Privacy Controller] URL:', req.url);
+    console.log('📨 [Privacy Controller] Body:', JSON.stringify(req.body, null, 2));
+    
     const { signed_request } = req.body;
 
     if (!signed_request) {
