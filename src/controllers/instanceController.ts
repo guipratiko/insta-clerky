@@ -10,8 +10,6 @@ import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   getInstagramAccountInfo,
-  getUserPermissions,
-  revokePermission,
 } from '../services/metaAPIService';
 import { META_CONFIG } from '../config/constants';
 import { emitInstagramUpdate } from '../socket/socketClient';
@@ -207,67 +205,6 @@ export const deleteInstance = async (
       return next(createValidationError('Usuário não autenticado'));
     }
 
-    // Buscar instância antes de deletar para revogar permissões
-    // Usar select para incluir accessToken (que tem select: false no schema)
-    const instance = await InstanceService.getByIdWithToken(id, userId);
-    
-    if (!instance) {
-      return next(createNotFoundError('Instância'));
-    }
-
-    // Se a instância tem accessToken e instagramAccountId, revogar permissões
-    if (instance.accessToken && instance.instagramAccountId) {
-      try {
-        console.log(`🔄 Revogando permissões da instância ${id}...`);
-        
-        // Listar permissões concedidas
-        const permissions = await getUserPermissions(
-          instance.accessToken,
-          instance.instagramAccountId
-        );
-
-        // Lista de permissões que podem ter sido concedidas
-        const possiblePermissions = [
-          'instagram_business_basic',
-          'instagram_business_manage_messages',
-          'instagram_business_manage_comments',
-          'instagram_business_content_publish',
-          'instagram_business_manage_insights',
-        ];
-
-        // Revogar apenas permissões que estão com status 'granted'
-        const grantedPermissions = permissions
-          .filter(p => p.status === 'granted')
-          .map(p => p.permission);
-
-        // Revogar cada permissão concedida
-        let revokedCount = 0;
-        for (const permission of grantedPermissions) {
-          const success = await revokePermission(
-            instance.accessToken,
-            instance.instagramAccountId,
-            permission
-          );
-          if (success) {
-            revokedCount++;
-            console.log(`✅ Permissão ${permission} revogada com sucesso`);
-          }
-        }
-
-        if (revokedCount > 0) {
-          console.log(`✅ ${revokedCount} permissão(ões) revogada(s) com sucesso`);
-        } else {
-          console.log(`ℹ️ Nenhuma permissão ativa encontrada para revogar`);
-        }
-      } catch (error: unknown) {
-        // Logar erro mas continuar com a deleção
-        console.error('⚠️ Erro ao revogar permissões (continuando com deleção):', error);
-      }
-    } else {
-      console.log(`ℹ️ Instância ${id} não possui accessToken ou instagramAccountId, pulando revogação de permissões`);
-    }
-
-    // Deletar instância do banco de dados
     const deleted = await InstanceService.delete(id, userId);
 
     if (!deleted) {
