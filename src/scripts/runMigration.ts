@@ -32,7 +32,7 @@ async function runMigrations() {
         const migrationSQL = readFileSync(migrationPath, 'utf-8');
 
         console.log(`\n🔄 Executando migration: ${file}`);
-        await client.query(migrationSQL);
+      await client.query(migrationSQL);
         console.log(`✅ Migration ${file} executada com sucesso!`);
       }
 

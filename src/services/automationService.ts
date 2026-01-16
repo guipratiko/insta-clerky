@@ -304,25 +304,40 @@ export class AutomationService {
     text: string
   ): Promise<Automation | null> {
     const automations = await this.getActiveByInstance(instanceId);
+    console.log(`📋 Total de automações ativas encontradas para instanceId ${instanceId}: ${automations.length}`);
+    
     const relevantAutomations = automations.filter((auto) => auto.type === type);
+    console.log(`📋 Automações do tipo "${type}": ${relevantAutomations.length}`);
+    
+    if (relevantAutomations.length > 0) {
+      relevantAutomations.forEach((auto, index) => {
+        console.log(`  ${index + 1}. ${auto.name} - trigger: ${auto.triggerType}, keywords: ${JSON.stringify(auto.keywords)}`);
+      });
+    }
 
     for (const automation of relevantAutomations) {
       if (automation.triggerType === 'all') {
+        console.log(`✅ Automação "${automation.name}" corresponde (trigger: all)`);
         return automation;
       }
 
       if (automation.triggerType === 'keyword') {
         const lowerText = text.toLowerCase();
-        const hasKeyword = automation.keywords.some((keyword) =>
-          lowerText.includes(keyword.toLowerCase())
-        );
+        const hasKeyword = automation.keywords.some((keyword) => {
+          const keywordLower = keyword.toLowerCase();
+          const matches = lowerText.includes(keywordLower);
+          console.log(`  🔎 Verificando palavra-chave "${keyword}" (${keywordLower}) em "${text}" (${lowerText}): ${matches ? '✅' : '❌'}`);
+          return matches;
+        });
 
         if (hasKeyword) {
+          console.log(`✅ Automação "${automation.name}" corresponde (palavra-chave encontrada)`);
           return automation;
         }
       }
     }
 
+    console.log(`❌ Nenhuma automação correspondeu`);
     return null;
   }
 }

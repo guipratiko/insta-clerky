@@ -79,11 +79,11 @@ export const exchangeCodeForToken = async (code: string): Promise<{
   try {
     // Usar URLSearchParams para enviar como form data no body
     const formData = new URLSearchParams({
-      client_id: META_CONFIG.APP_ID,
-      client_secret: META_CONFIG.APP_SECRET,
-      grant_type: 'authorization_code',
-      redirect_uri: META_CONFIG.REDIRECT_URI,
-      code,
+        client_id: META_CONFIG.APP_ID,
+        client_secret: META_CONFIG.APP_SECRET,
+        grant_type: 'authorization_code',
+        redirect_uri: META_CONFIG.REDIRECT_URI,
+        code,
     });
 
     const response = await axios.post(url, formData.toString(), {

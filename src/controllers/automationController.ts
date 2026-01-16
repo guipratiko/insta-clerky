@@ -189,8 +189,8 @@ export const createAutomation = async (
     if (triggerType === 'keyword') {
       if (!keywords || keywords.length === 0) {
         return next(createValidationError('É necessário informar pelo menos uma palavra-chave quando o tipo de trigger é "Palavra-chave"'));
-      }
-      
+    }
+
       // Verificar se todas as palavras-chave não estão vazias após trim
       const validKeywords = keywords.filter((keyword) => keyword && keyword.trim().length > 0);
       if (validKeywords.length === 0) {
@@ -359,7 +359,7 @@ export const updateAutomation = async (
         // Responder no comentário: precisa de texto (não pode usar sequência)
         if (responseText !== undefined && responseText.trim().length === 0) {
           return next(createValidationError('Texto da resposta não pode estar vazio para comentários'));
-        }
+    }
         if (responseSequence !== undefined && responseSequence.length > 0) {
           return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
         }
