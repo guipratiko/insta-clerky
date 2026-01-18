@@ -11,6 +11,7 @@ import {
   sendDirectMessageVideo,
   sendDirectMessageAudio,
   replyToComment,
+  sendDirectMessageByCommentId,
 } from './metaAPIService';
 import { pgPool } from '../config/databases';
 import { emitInstagramUpdate } from '../socket/socketClient';
@@ -56,6 +57,12 @@ export const processDirectMessage = async (
       ]
     );
 
+    // Verificar se não é mensagem enviada pela própria conta
+    if (senderId === instance.instagramAccountId) {
+      console.log(`⚠️ Ignorando mensagem enviada pela própria conta (senderId: ${senderId})`);
+      return;
+    }
+
     // Buscar automações ativas para DM
     const automation = await AutomationService.findMatchingAutomation(
       instanceId,
@@ -64,6 +71,23 @@ export const processDirectMessage = async (
     );
 
     if (automation) {
+      // Verificar se preventDuplicate está ativo e se já processamos este contato
+      if (automation.preventDuplicate) {
+        const existingReport = await pgPool.query(
+          `SELECT id FROM instagram_reports 
+           WHERE instance_id = $1 
+           AND user_id_instagram = $2 
+           AND interaction_type = 'dm'
+           LIMIT 1`,
+          [instanceId, senderId]
+        );
+
+        if (existingReport.rows.length > 0) {
+          console.log(`⚠️ Contato ${senderId} já foi processado por esta automação. Ignorando.`);
+          return;
+        }
+      }
+
       // Verificar se a instância tem instagramAccountId
       if (!instance.instagramAccountId) {
         console.error(`❌ Instância não tem instagramAccountId`);
@@ -247,6 +271,12 @@ export const processComment = async (
       ]
     );
 
+    // Verificar se não é comentário da própria conta
+    if (fromUserId === instance.instagramAccountId) {
+      console.log(`⚠️ Ignorando comentário da própria conta (fromUserId: ${fromUserId})`);
+      return;
+    }
+
     // Buscar automações ativas para comentários
     const automation = await AutomationService.findMatchingAutomation(
       instanceId,
@@ -255,6 +285,23 @@ export const processComment = async (
     );
 
     if (automation) {
+      // Verificar se preventDuplicate está ativo e se já processamos este contato
+      if (automation.preventDuplicate) {
+        const existingReport = await pgPool.query(
+          `SELECT id FROM instagram_reports 
+           WHERE instance_id = $1 
+           AND user_id_instagram = $2 
+           AND interaction_type = 'comment'
+           LIMIT 1`,
+          [instanceId, fromUserId]
+        );
+
+        if (existingReport.rows.length > 0) {
+          console.log(`⚠️ Contato ${fromUserId} já foi processado por esta automação. Ignorando.`);
+          return;
+        }
+      }
+
       // Verificar se a instância tem instagramAccountId
       if (!instance.instagramAccountId) {
         console.error(`❌ Instância não tem instagramAccountId`);
@@ -297,60 +344,31 @@ export const processComment = async (
           );
           allResponses.push(responseText);
         } else if (automation.responseType === 'direct') {
-          // Enviar DM quando recebe comentário: pode ser sequência ou texto
-          if (automation.responseSequence && automation.responseSequence.length > 0) {
-            // Processar sequência de mensagens
-            const pageId = instance.instagramAccountId || instanceWithToken.instagramAccountId;
-            if (!pageId) {
-              throw new Error('Instagram Account ID não encontrado');
-            }
-
-            for (let i = 0; i < automation.responseSequence.length; i++) {
-              const item = automation.responseSequence[i];
-              
-              // Aplicar delay antes de enviar esta mensagem
-              if (item.delay > 0) {
-                console.log(`⏳ Aplicando delay de ${item.delay} segundos antes da mensagem ${i + 1}...`);
-                await new Promise((resolve) => setTimeout(resolve, item.delay * 1000));
-              }
-
-              // Enviar mensagem baseada no tipo
-              switch (item.type) {
-                case 'text':
-                  let contentToSend = item.content;
-                  // Não substituir $user-contact em sequências de DM (só em comentários)
-                  await sendDirectMessage(instanceWithToken.accessToken, fromUserId, contentToSend);
-                  allResponses.push(`Texto: ${contentToSend}`);
-                  break;
-                case 'image':
-                  await sendDirectMessageImage(instanceWithToken.accessToken, pageId, fromUserId, item.content);
-                  allResponses.push(`Imagem: ${item.content}`);
-                  break;
-                case 'video':
-                  await sendDirectMessageVideo(instanceWithToken.accessToken, pageId, fromUserId, item.content);
-                  allResponses.push(`Vídeo: ${item.content}`);
-                  break;
-                case 'audio':
-                  await sendDirectMessageAudio(instanceWithToken.accessToken, pageId, fromUserId, item.content);
-                  allResponses.push(`Áudio: ${item.content}`);
-                  break;
-              }
-            }
-          } else {
-            // Fallback para texto simples
-            let responseText = automation.responseText || '';
-            if (!responseText || responseText.trim().length === 0) {
-              console.error(`❌ Automação ${automation.id} não tem texto de resposta nem sequência configurada`);
-              throw new Error('Configure o texto da resposta ou sequência de mensagens na automação.');
-            }
-
-          await sendDirectMessage(
-            instanceWithToken.accessToken,
-            fromUserId,
-              responseText
-          );
-            allResponses.push(responseText);
+          // Enviar DM quando recebe comentário: apenas texto (não sequência)
+          // Usar sendDirectMessageByCommentId com o comment_id
+          const pageId = instance.instagramAccountId || instanceWithToken.instagramAccountId;
+          if (!pageId) {
+            throw new Error('Instagram Account ID não encontrado');
           }
+
+          let responseText = automation.responseText || '';
+          if (fromUsername && responseText) {
+            responseText = responseText.replace(/\$user-contact/g, `@${fromUsername}`);
+          }
+
+          if (!responseText || responseText.trim().length === 0) {
+            console.error(`❌ Automação ${automation.id} não tem texto de resposta configurado`);
+            throw new Error('Texto da resposta está vazio. Configure o texto da resposta na automação.');
+          }
+
+          // Usar a nova função que envia DM via comment_id
+          await sendDirectMessageByCommentId(
+            instanceWithToken.accessToken,
+            pageId,
+            commentId,
+            responseText
+          );
+          allResponses.push(responseText);
         }
 
         // Criar relatório

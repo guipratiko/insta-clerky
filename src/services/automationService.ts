@@ -23,6 +23,7 @@ export interface Automation {
   responseType: 'direct' | 'comment';
   responseSequence?: ResponseSequenceItem[]; // Para DM (sequência de mensagens)
   delaySeconds: number; // Delay global (deprecated, usar delay em cada item da sequência)
+  preventDuplicate: boolean; // Evitar que o mesmo contato entre novamente no mesmo fluxo
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -39,6 +40,7 @@ export interface CreateAutomationData {
   responseType: 'direct' | 'comment';
   responseSequence?: ResponseSequenceItem[]; // Obrigatório para DM quando responseType === 'direct'
   delaySeconds?: number;
+  preventDuplicate?: boolean; // Padrão: true
   isActive?: boolean;
 }
 
@@ -50,6 +52,7 @@ export interface UpdateAutomationData {
   responseType?: 'direct' | 'comment';
   responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
+  preventDuplicate?: boolean;
   isActive?: boolean;
 }
 
@@ -74,6 +77,7 @@ export class AutomationService {
       responseType: row.response_type,
       responseSequence: responseSequence && responseSequence.length > 0 ? responseSequence : undefined,
       delaySeconds: row.delay_seconds || 0,
+      preventDuplicate: row.prevent_duplicate !== undefined ? row.prevent_duplicate : true,
       isActive: row.is_active,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -103,8 +107,8 @@ export class AutomationService {
     const query = `
       INSERT INTO instagram_automations (
         user_id, instance_id, name, type, trigger_type,
-        keywords, response_text, response_type, response_sequence, delay_seconds, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        keywords, response_text, response_type, response_sequence, delay_seconds, prevent_duplicate, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
@@ -119,6 +123,7 @@ export class AutomationService {
       data.responseType,
       data.responseSequence ? JSON.stringify(data.responseSequence) : null,
       data.delaySeconds !== undefined ? Math.max(0, Math.floor(data.delaySeconds)) : 0,
+      data.preventDuplicate !== undefined ? data.preventDuplicate : true,
       data.isActive !== undefined ? data.isActive : true,
     ]);
 
@@ -254,6 +259,11 @@ export class AutomationService {
     if (data.delaySeconds !== undefined) {
       updates.push(`delay_seconds = $${paramIndex++}`);
       values.push(Math.max(0, Math.floor(data.delaySeconds)));
+    }
+
+    if (data.preventDuplicate !== undefined) {
+      updates.push(`prevent_duplicate = $${paramIndex++}`);
+      values.push(data.preventDuplicate);
     }
 
     if (data.isActive !== undefined) {

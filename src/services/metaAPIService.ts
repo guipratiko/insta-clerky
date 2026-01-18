@@ -224,6 +224,23 @@ export const replyToComment = async (
 };
 
 /**
+ * Enviar mensagem direta via comment_id (quando recebe comentário e responde via DM)
+ */
+export const sendDirectMessageByCommentId = async (
+  accessToken: string,
+  pageId: string,
+  commentId: string,
+  message: string
+): Promise<unknown> => {
+  const response = await requestMetaAPI('POST', `/${pageId}/messages`, accessToken, {
+    recipient: { comment_id: commentId },
+    message: { text: message },
+  });
+
+  return response.data;
+};
+
+/**
  * Enviar mensagem direta com imagem
  */
 export const sendDirectMessageImage = async (
