@@ -16,6 +16,7 @@ export interface Report {
   interactionText: string;
   responseText?: string;
   responseStatus: 'pending' | 'sent' | 'failed';
+  automationId?: string; // ID da automação que processou esta interação
   timestamp: number;
   createdAt: Date;
 }
@@ -31,6 +32,7 @@ export interface CreateReportData {
   interactionText: string;
   responseText?: string;
   responseStatus?: 'pending' | 'sent' | 'failed';
+  automationId?: string; // ID da automação que processou esta interação
   timestamp: number;
 }
 
@@ -61,6 +63,7 @@ export class ReportService {
       interactionText: row.interaction_text,
       responseText: row.response_text,
       responseStatus: row.response_status,
+      automationId: row.automation_id,
       timestamp: parseInt(row.timestamp),
       createdAt: row.created_at,
     };
@@ -74,8 +77,8 @@ export class ReportService {
       INSERT INTO instagram_reports (
         instance_id, user_id, interaction_type, comment_id,
         user_id_instagram, media_id, username, interaction_text,
-        response_text, response_status, timestamp
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        response_text, response_status, automation_id, timestamp
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
@@ -90,6 +93,7 @@ export class ReportService {
       data.interactionText,
       data.responseText || null,
       data.responseStatus || 'pending',
+      data.automationId || null,
       data.timestamp,
     ]);
 

@@ -71,19 +71,19 @@ export const processDirectMessage = async (
     );
 
     if (automation) {
-      // Verificar se preventDuplicate está ativo e se já processamos este contato
+      // Verificar se preventDuplicate está ativo e se já processamos este contato com esta automação específica
       if (automation.preventDuplicate) {
         const existingReport = await pgPool.query(
           `SELECT id FROM instagram_reports 
-           WHERE instance_id = $1 
+           WHERE automation_id = $1 
            AND user_id_instagram = $2 
            AND interaction_type = 'dm'
            LIMIT 1`,
-          [instanceId, senderId]
+          [automation.id, senderId]
         );
 
         if (existingReport.rows.length > 0) {
-          console.log(`⚠️ Contato ${senderId} já foi processado por esta automação. Ignorando.`);
+          console.log(`⚠️ Contato ${senderId} já foi processado pela automação ${automation.id}. Ignorando.`);
           return;
         }
       }
@@ -183,6 +183,7 @@ export const processDirectMessage = async (
           interactionText: messageText,
           responseText: allResponses.join(' | '),
           responseStatus: 'sent',
+          automationId: automation.id,
           timestamp,
         });
 
@@ -210,6 +211,7 @@ export const processDirectMessage = async (
           interactionText: messageText,
           responseText: failedResponseText,
           responseStatus: 'failed',
+          automationId: automation.id,
           timestamp,
         });
       }
@@ -285,19 +287,19 @@ export const processComment = async (
     );
 
     if (automation) {
-      // Verificar se preventDuplicate está ativo e se já processamos este contato
+      // Verificar se preventDuplicate está ativo e se já processamos este contato com esta automação específica
       if (automation.preventDuplicate) {
         const existingReport = await pgPool.query(
           `SELECT id FROM instagram_reports 
-           WHERE instance_id = $1 
+           WHERE automation_id = $1 
            AND user_id_instagram = $2 
            AND interaction_type = 'comment'
            LIMIT 1`,
-          [instanceId, fromUserId]
+          [automation.id, fromUserId]
         );
 
         if (existingReport.rows.length > 0) {
-          console.log(`⚠️ Contato ${fromUserId} já foi processado por esta automação. Ignorando.`);
+          console.log(`⚠️ Contato ${fromUserId} já foi processado pela automação ${automation.id}. Ignorando.`);
           return;
         }
       }
@@ -342,7 +344,7 @@ export const processComment = async (
             commentId,
             responseText
           );
-          allResponses.push(responseText);
+          allResponses.push(`Comentário: ${responseText}`);
         } else if (automation.responseType === 'direct') {
           // Enviar DM quando recebe comentário: apenas texto (não sequência)
           // Usar sendDirectMessageByCommentId com o comment_id
@@ -368,7 +370,50 @@ export const processComment = async (
             commentId,
             responseText
           );
-          allResponses.push(responseText);
+          allResponses.push(`DM: ${responseText}`);
+        } else if (automation.responseType === 'comment_and_dm') {
+          // Primeiro responder o comentário, depois enviar DM
+          const pageId = instance.instagramAccountId || instanceWithToken.instagramAccountId;
+          if (!pageId) {
+            throw new Error('Instagram Account ID não encontrado');
+          }
+
+          // 1. Responder no comentário
+          let commentResponseText = automation.responseText || '';
+          if (fromUsername && commentResponseText) {
+            commentResponseText = commentResponseText.replace(/\$user-contact/g, `@${fromUsername}`);
+          }
+
+          if (!commentResponseText || commentResponseText.trim().length === 0) {
+            console.error(`❌ Automação ${automation.id} não tem texto de resposta do comentário configurado`);
+            throw new Error('Texto da resposta do comentário está vazio.');
+          }
+
+          await replyToComment(
+            instanceWithToken.accessToken,
+            commentId,
+            commentResponseText
+          );
+          allResponses.push(`Comentário: ${commentResponseText}`);
+
+          // 2. Enviar DM usando sendDirectMessageByCommentId
+          let dmResponseText = automation.responseTextDM || '';
+          if (fromUsername && dmResponseText) {
+            dmResponseText = dmResponseText.replace(/\$user-contact/g, `@${fromUsername}`);
+          }
+
+          if (!dmResponseText || dmResponseText.trim().length === 0) {
+            console.error(`❌ Automação ${automation.id} não tem texto de resposta da DM configurado`);
+            throw new Error('Texto da resposta da DM está vazio.');
+          }
+
+          await sendDirectMessageByCommentId(
+            instanceWithToken.accessToken,
+            pageId,
+            commentId,
+            dmResponseText
+          );
+          allResponses.push(`DM: ${dmResponseText}`);
         }
 
         // Criar relatório
@@ -383,6 +428,7 @@ export const processComment = async (
           interactionText: text,
           responseText: allResponses.join(' | '),
           responseStatus: 'sent',
+          automationId: automation.id,
           timestamp,
         });
 
@@ -411,6 +457,7 @@ export const processComment = async (
           interactionText: text,
           responseText: failedResponseText,
           responseStatus: 'failed',
+          automationId: automation.id,
           timestamp,
         });
       }

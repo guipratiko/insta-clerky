@@ -6,6 +6,7 @@ import {
   handleControllerError,
 } from '../utils/errorHelpers';
 import { AutomationService, ResponseSequenceItem } from '../services/automationService';
+import { pgPool } from '../config/databases';
 
 interface CreateAutomationBody {
   instanceId: string;
@@ -14,9 +15,11 @@ interface CreateAutomationBody {
   triggerType: 'keyword' | 'all';
   keywords?: string[];
   responseText: string;
-  responseType: 'direct' | 'comment';
+  responseType: 'direct' | 'comment' | 'comment_and_dm';
+  responseTextDM?: string; // Texto da DM quando responseType = 'comment_and_dm'
   responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
+  preventDuplicate?: boolean;
   isActive?: boolean;
 }
 
@@ -25,9 +28,11 @@ interface UpdateAutomationBody {
   triggerType?: 'keyword' | 'all';
   keywords?: string[];
   responseText?: string;
-  responseType?: 'direct' | 'comment';
+  responseType?: 'direct' | 'comment' | 'comment_and_dm';
+  responseTextDM?: string; // Texto da DM quando responseType = 'comment_and_dm'
   responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
+  preventDuplicate?: boolean;
   isActive?: boolean;
 }
 
@@ -237,8 +242,10 @@ export const createAutomation = async (
       keywords: triggerType === 'keyword' ? keywords : undefined,
       responseText: finalResponseText,
       responseType,
+      responseTextDM: body.responseTextDM,
       responseSequence: (type === 'dm' && responseType === 'direct') || (type === 'comment' && responseType === 'direct' && responseSequence && responseSequence.length > 0) ? responseSequence : undefined,
       delaySeconds: delaySeconds !== undefined ? delaySeconds : 0,
+      preventDuplicate: body.preventDuplicate !== undefined ? body.preventDuplicate : true,
       isActive: isActive !== undefined ? isActive : true,
     });
 
@@ -459,6 +466,9 @@ export const updateAutomation = async (
             // Se não tem sequência, salva texto
             updateData.responseText = responseText.trim();
           }
+        } else if (finalResponseType === 'comment_and_dm') {
+          // Responder comentário e DM: precisa de texto do comentário
+          updateData.responseText = responseText.trim();
         }
       } else if (finalType === 'dm') {
         // Para DM, responseText só é usado se não houver sequência (caso legado)
@@ -468,6 +478,11 @@ export const updateAutomation = async (
           updateData.responseText = responseText.trim();
         }
       }
+    }
+    
+    // Atualizar responseTextDM quando responseType = 'comment_and_dm'
+    if (body.responseTextDM !== undefined && finalResponseType === 'comment_and_dm') {
+      updateData.responseTextDM = body.responseTextDM.trim();
     }
     
     // Atualizar responseSequence
@@ -481,6 +496,7 @@ export const updateAutomation = async (
     }
     
     if (delaySeconds !== undefined) updateData.delaySeconds = delaySeconds;
+    if (body.preventDuplicate !== undefined) updateData.preventDuplicate = body.preventDuplicate;
     if (isActive !== undefined) updateData.isActive = isActive;
 
     const automation = await AutomationService.update(id, userId, updateData);
@@ -565,5 +581,88 @@ export const toggleAutomation = async (
     });
   } catch (error: unknown) {
     return next(handleControllerError(error, 'Erro ao alternar automação'));
+  }
+};
+
+/**
+ * Limpar contatos processados de uma automação específica
+ */
+export const clearAutomationContacts = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return next(createValidationError('Usuário não autenticado'));
+    }
+
+    // Verificar se a automação existe e pertence ao usuário
+    const automation = await AutomationService.getById(id, userId);
+    if (!automation) {
+      return next(createNotFoundError('Automação'));
+    }
+
+    // Deletar relatórios desta automação específica
+    const result = await pgPool.query(
+      `DELETE FROM instagram_reports 
+       WHERE automation_id = $1 AND user_id = $2`,
+      [id, userId]
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Contatos da automação limpos com sucesso',
+      deletedCount: result.rowCount || 0,
+    });
+  } catch (error: unknown) {
+    return next(handleControllerError(error, 'Erro ao limpar contatos da automação'));
+  }
+};
+
+/**
+ * Limpar contatos processados de todas as automações de uma instância
+ */
+export const clearAllAutomationContacts = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { instanceId } = req.query;
+
+    if (!userId) {
+      return next(createValidationError('Usuário não autenticado'));
+    }
+
+    if (!instanceId || typeof instanceId !== 'string') {
+      return next(createValidationError('instanceId é obrigatório'));
+    }
+
+    // Verificar se a instância pertence ao usuário (através das automações)
+    const automations = await AutomationService.getByUserId(userId, instanceId);
+    if (automations.length === 0) {
+      return next(createValidationError('Nenhuma automação encontrada para esta instância'));
+    }
+
+    // Deletar relatórios de todas as automações desta instância
+    const automationIds = automations.map((a) => a.id);
+    const result = await pgPool.query(
+      `DELETE FROM instagram_reports 
+       WHERE automation_id = ANY($1) AND user_id = $2`,
+      [automationIds, userId]
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Contatos de todas as automações limpos com sucesso',
+      deletedCount: result.rowCount || 0,
+    });
+  } catch (error: unknown) {
+    return next(handleControllerError(error, 'Erro ao limpar contatos de todas as automações'));
   }
 };

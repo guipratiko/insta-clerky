@@ -14,5 +14,7 @@ router.get('/:id', automationController.getAutomationById);
 router.put('/:id', automationController.updateAutomation);
 router.delete('/:id', automationController.deleteAutomation);
 router.post('/:id/toggle', automationController.toggleAutomation);
+router.delete('/:id/clear-contacts', automationController.clearAutomationContacts);
+router.delete('/clear-all-contacts', automationController.clearAllAutomationContacts);
 
 export default router;

@@ -20,7 +20,8 @@ export interface Automation {
   triggerType: 'keyword' | 'all';
   keywords: string[];
   responseText: string; // Para comentários (sempre texto)
-  responseType: 'direct' | 'comment';
+  responseType: 'direct' | 'comment' | 'comment_and_dm';
+  responseTextDM?: string; // Texto da DM quando responseType = 'comment_and_dm'
   responseSequence?: ResponseSequenceItem[]; // Para DM (sequência de mensagens)
   delaySeconds: number; // Delay global (deprecated, usar delay em cada item da sequência)
   preventDuplicate: boolean; // Evitar que o mesmo contato entre novamente no mesmo fluxo
@@ -37,7 +38,8 @@ export interface CreateAutomationData {
   triggerType: 'keyword' | 'all';
   keywords?: string[];
   responseText: string; // Obrigatório para comentários
-  responseType: 'direct' | 'comment';
+  responseType: 'direct' | 'comment' | 'comment_and_dm';
+  responseTextDM?: string; // Texto da DM quando responseType = 'comment_and_dm'
   responseSequence?: ResponseSequenceItem[]; // Obrigatório para DM quando responseType === 'direct'
   delaySeconds?: number;
   preventDuplicate?: boolean; // Padrão: true
@@ -49,7 +51,8 @@ export interface UpdateAutomationData {
   triggerType?: 'keyword' | 'all';
   keywords?: string[];
   responseText?: string;
-  responseType?: 'direct' | 'comment';
+  responseType?: 'direct' | 'comment' | 'comment_and_dm';
+  responseTextDM?: string; // Texto da DM quando responseType = 'comment_and_dm'
   responseSequence?: ResponseSequenceItem[];
   delaySeconds?: number;
   preventDuplicate?: boolean;
@@ -75,6 +78,7 @@ export class AutomationService {
       keywords: parseJsonbField<string[]>(row.keywords, []),
       responseText: row.response_text,
       responseType: row.response_type,
+      responseTextDM: row.response_text_dm || undefined,
       responseSequence: responseSequence && responseSequence.length > 0 ? responseSequence : undefined,
       delaySeconds: row.delay_seconds || 0,
       preventDuplicate: row.prevent_duplicate !== undefined ? row.prevent_duplicate : true,
@@ -107,8 +111,8 @@ export class AutomationService {
     const query = `
       INSERT INTO instagram_automations (
         user_id, instance_id, name, type, trigger_type,
-        keywords, response_text, response_type, response_sequence, delay_seconds, prevent_duplicate, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        keywords, response_text, response_type, response_text_dm, response_sequence, delay_seconds, prevent_duplicate, is_active
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
 
@@ -121,6 +125,7 @@ export class AutomationService {
       data.triggerType === 'keyword' ? data.keywords : null,
       data.responseText,
       data.responseType,
+      data.responseTextDM || null,
       data.responseSequence ? JSON.stringify(data.responseSequence) : null,
       data.delaySeconds !== undefined ? Math.max(0, Math.floor(data.delaySeconds)) : 0,
       data.preventDuplicate !== undefined ? data.preventDuplicate : true,
@@ -249,6 +254,11 @@ export class AutomationService {
     if (data.responseType !== undefined) {
       updates.push(`response_type = $${paramIndex++}`);
       values.push(data.responseType);
+    }
+
+    if (data.responseTextDM !== undefined) {
+      updates.push(`response_text_dm = $${paramIndex++}`);
+      values.push(data.responseTextDM || null);
     }
 
     if (data.responseSequence !== undefined) {
