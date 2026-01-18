@@ -115,8 +115,10 @@ export const createAutomation = async (
       keywords,
       responseText,
       responseType,
+      responseTextDM,
       responseSequence,
       delaySeconds,
+      preventDuplicate,
       isActive,
     }: CreateAutomationBody = req.body;
 
@@ -242,10 +244,10 @@ export const createAutomation = async (
       keywords: triggerType === 'keyword' ? keywords : undefined,
       responseText: finalResponseText,
       responseType,
-      responseTextDM: body.responseTextDM,
+      responseTextDM: responseTextDM,
       responseSequence: (type === 'dm' && responseType === 'direct') || (type === 'comment' && responseType === 'direct' && responseSequence && responseSequence.length > 0) ? responseSequence : undefined,
       delaySeconds: delaySeconds !== undefined ? delaySeconds : 0,
-      preventDuplicate: body.preventDuplicate !== undefined ? body.preventDuplicate : true,
+      preventDuplicate: preventDuplicate !== undefined ? preventDuplicate : true,
       isActive: isActive !== undefined ? isActive : true,
     });
 
@@ -336,8 +338,10 @@ export const updateAutomation = async (
       keywords,
       responseText,
       responseType,
+      responseTextDM,
       responseSequence,
       delaySeconds,
+      preventDuplicate,
       isActive,
     }: UpdateAutomationBody = req.body;
 
@@ -481,8 +485,8 @@ export const updateAutomation = async (
     }
     
     // Atualizar responseTextDM quando responseType = 'comment_and_dm'
-    if (body.responseTextDM !== undefined && finalResponseType === 'comment_and_dm') {
-      updateData.responseTextDM = body.responseTextDM.trim();
+    if (responseTextDM !== undefined && finalResponseType === 'comment_and_dm') {
+      updateData.responseTextDM = responseTextDM.trim();
     }
     
     // Atualizar responseSequence
@@ -496,7 +500,7 @@ export const updateAutomation = async (
     }
     
     if (delaySeconds !== undefined) updateData.delaySeconds = delaySeconds;
-    if (body.preventDuplicate !== undefined) updateData.preventDuplicate = body.preventDuplicate;
+    if (preventDuplicate !== undefined) updateData.preventDuplicate = preventDuplicate;
     if (isActive !== undefined) updateData.isActive = isActive;
 
     const automation = await AutomationService.update(id, userId, updateData);
