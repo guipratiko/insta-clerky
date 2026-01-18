@@ -169,6 +169,17 @@ export const createAutomation = async (
             return next(createValidationError('É necessário informar texto da resposta ou sequência de mensagens para enviar DM quando recebe comentário'));
           }
         }
+      } else if (responseType === 'comment_and_dm') {
+        // Responder comentário e depois enviar DM: precisa de ambos os textos
+        if (!responseText || responseText.trim().length === 0) {
+          return next(createValidationError('Texto da resposta do comentário é obrigatório quando o tipo de resposta é "Comentário e DM"'));
+        }
+        if (!responseTextDM || responseTextDM.trim().length === 0) {
+          return next(createValidationError('Texto da DM é obrigatório quando o tipo de resposta é "Comentário e DM"'));
+        }
+        if (responseSequence && responseSequence.length > 0) {
+          return next(createValidationError('Tipo de resposta "Comentário e DM" não suporta sequência de mensagens. Use apenas texto.'));
+        }
       }
     } else if (type === 'dm') {
       // Automação para Direct Messages
@@ -229,6 +240,9 @@ export const createAutomation = async (
           // Se não tem sequência, salva texto
           finalResponseText = (responseText || '').trim();
         }
+      } else if (responseType === 'comment_and_dm') {
+        // Responder comentário e depois enviar DM: precisa do texto do comentário
+        finalResponseText = (responseText || '').trim();
       }
     } else if (type === 'dm') {
       // Para DM, responseText só é usado se não houver sequência (caso legado)
@@ -374,6 +388,17 @@ export const updateAutomation = async (
         if (responseSequence !== undefined && responseSequence.length > 0) {
           return next(createValidationError('Comentários não suportam sequência de mensagens. Use apenas texto.'));
         }
+      } else if (finalResponseType === 'comment_and_dm') {
+        // Responder comentário e depois enviar DM: precisa de ambos os textos
+        if (responseText !== undefined && responseText.trim().length === 0) {
+          return next(createValidationError('Texto da resposta do comentário não pode estar vazio quando o tipo de resposta é "Comentário e DM"'));
+        }
+        if (responseTextDM !== undefined && responseTextDM.trim().length === 0) {
+          return next(createValidationError('Texto da DM não pode estar vazio quando o tipo de resposta é "Comentário e DM"'));
+        }
+        if (responseSequence !== undefined && responseSequence.length > 0) {
+          return next(createValidationError('Tipo de resposta "Comentário e DM" não suporta sequência de mensagens. Use apenas texto.'));
+        }
       } else if (finalResponseType === 'direct') {
         // Responder via DM quando recebe comentário: pode usar sequência OU texto
         if (responseSequence !== undefined && responseSequence.length > 0) {
@@ -470,6 +495,9 @@ export const updateAutomation = async (
             // Se não tem sequência, salva texto
             updateData.responseText = responseText.trim();
           }
+        } else if (finalResponseType === 'comment_and_dm') {
+          // Responder comentário e DM: precisa do texto do comentário
+          updateData.responseText = responseText.trim();
         } else if (finalResponseType === 'comment_and_dm') {
           // Responder comentário e DM: precisa de texto do comentário
           updateData.responseText = responseText.trim();
