@@ -16,9 +16,16 @@ export const deauthorize = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { signed_request } = req.body;
+    // Log para debug
+    console.log('📥 [Deauthorize] Content-Type:', req.headers['content-type']);
+    console.log('📥 [Deauthorize] Body recebido:', JSON.stringify(req.body, null, 2));
+    console.log('📥 [Deauthorize] Body keys:', Object.keys(req.body || {}));
+
+    // O Meta pode enviar signed_request com hífen ou underscore
+    const signed_request = req.body.signed_request || req.body['signed-request'];
 
     if (!signed_request) {
+      console.error('❌ [Deauthorize] signed_request não encontrado no body');
       res.status(400).json({
         status: 'error',
         message: 'signed_request é obrigatório',
@@ -66,7 +73,8 @@ export const deleteData = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { signed_request } = req.body;
+    // O Meta pode enviar signed_request com hífen ou underscore
+    const signed_request = req.body.signed_request || req.body['signed-request'];
 
     if (!signed_request) {
       res.status(400).json({
