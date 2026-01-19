@@ -340,6 +340,7 @@ export const handleOAuthCallback = async (
     const dataToSave = {
       instagramAccountId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real usado nos webhooks
       username: accountInfo.username,
+      profilePictureUrl: accountInfo.profile_picture_url,
       accessToken: longLivedTokenData.access_token.substring(0, 20) + '...', // Log apenas início do token por segurança
       pageId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real
       pageName: accountInfo.name || accountInfo.username,
@@ -370,6 +371,7 @@ export const handleOAuthCallback = async (
       {
         instagramAccountId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real usado nos webhooks
         username: accountInfo.username,
+        profilePictureUrl: accountInfo.profile_picture_url,
         accessToken: longLivedTokenData.access_token,
         pageId: accountInfo.user_id || tokenData.user_id, // user_id do accountInfo é o ID real
         pageName: accountInfo.name || accountInfo.username,

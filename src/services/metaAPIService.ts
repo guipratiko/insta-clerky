@@ -145,9 +145,10 @@ export const getInstagramAccountInfo = async (accessToken: string): Promise<{
   username: string;
   account_type: string;
   name?: string;
+  profile_picture_url?: string;
 }> => {
   const response = await requestMetaAPI('GET', '/me', accessToken, {
-    fields: 'user_id,username,account_type,name',
+    fields: 'user_id,username,account_type,name,profile_picture_url',
   });
 
   return response.data as {
@@ -155,6 +156,7 @@ export const getInstagramAccountInfo = async (accessToken: string): Promise<{
     username: string;
     account_type: string;
     name?: string;
+    profile_picture_url?: string;
   };
 };
 

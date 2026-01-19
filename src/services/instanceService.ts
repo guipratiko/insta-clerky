@@ -106,6 +106,7 @@ export class InstanceService {
     data: {
       instagramAccountId: string;
       username: string;
+      profilePictureUrl?: string;
       accessToken: string;
       pageId: string;
       pageName: string;

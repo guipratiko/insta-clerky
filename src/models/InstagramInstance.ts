@@ -9,6 +9,7 @@ export interface IInstagramInstance extends Document {
   token?: string; // Token para autenticação de webhooks externos
   instagramAccountId?: string; // ID da conta no Instagram (preenchido após OAuth)
   username?: string; // Username do Instagram (preenchido após OAuth)
+  profilePictureUrl?: string; // URL da foto de perfil do Instagram (preenchido após OAuth)
   accessToken?: string; // Token de acesso long-lived (preenchido após OAuth)
   pageId?: string; // ID da página associada (preenchido após OAuth)
   pageName?: string; // Nome da página (preenchido após OAuth)
@@ -50,6 +51,11 @@ const InstagramInstanceSchema: Schema = new Schema(
       trim: true,
     },
     username: {
+      type: String,
+      required: false, // Preenchido apenas após conexão OAuth
+      trim: true,
+    },
+    profilePictureUrl: {
       type: String,
       required: false, // Preenchido apenas após conexão OAuth
       trim: true,
